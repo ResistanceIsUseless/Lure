@@ -8,7 +8,7 @@ import pytest
 from models import VectorType
 from vectors import get_vector, list_vectors
 
-CALLBACK_URL = "https://testtoken.oob.cbhzdev.com/vec/test"
+CALLBACK_URL = "https://testtoken.oob.example.com/vec/test"
 
 
 class TestVectorRegistry:

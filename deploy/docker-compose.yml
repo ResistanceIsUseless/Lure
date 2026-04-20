@@ -4,11 +4,11 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      - INTERACTSH_DOMAIN=${OOB_DOMAIN:-oob.cbhzdev.com}
+      - INTERACTSH_DOMAIN=${OOB_DOMAIN:-oob.example.com}
       - INTERACTSH_IP=${PUBLIC_IP}
       - INTERACTSH_TOKEN=${INTERACTSH_TOKEN}
     command: >
-      -domain ${OOB_DOMAIN:-oob.cbhzdev.com}
+      -domain ${OOB_DOMAIN:-oob.example.com}
       -ip ${PUBLIC_IP}
       -listen-ip 0.0.0.0
       -auth
@@ -29,8 +29,8 @@ services:
     env_file:
       - ../vector_server/.env
     environment:
-      - OOB_DOMAIN=${OOB_DOMAIN:-oob.cbhzdev.com}
-      - CONTENT_DOMAIN=${CONTENT_DOMAIN:-content.cbhzdev.com}
+      - OOB_DOMAIN=${OOB_DOMAIN:-oob.example.com}
+      - CONTENT_DOMAIN=${CONTENT_DOMAIN:-content.example.com}
       - INTERACTSH_URL=http://127.0.0.1:80
       - INTERACTSH_TOKEN=${INTERACTSH_TOKEN}
     depends_on:

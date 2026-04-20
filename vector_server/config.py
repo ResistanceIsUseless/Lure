@@ -5,8 +5,8 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     # Domains
-    oob_domain: str = "oob.cbhzdev.com"
-    content_domain: str = "content.cbhzdev.com"
+    oob_domain: str = "oob.example.com"
+    content_domain: str = "content.example.com"
     public_ip: str = ""
 
     # Interactsh

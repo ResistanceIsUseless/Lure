@@ -88,7 +88,7 @@ def _ingest_interactsh_event(event: dict) -> None:
     """Parse an Interactsh interaction record and feed it to the correlation engine."""
     unique_id = event.get("unique-id", "")
     # Interactsh unique-id contains our correlation token as a prefix of the subdomain
-    # Format: <token>.<random>.oob.cbhzdev.com or just the subdomain portion
+    # Format: <token>.<random>.oob.example.com or just the subdomain portion
     token = unique_id.split(".")[0] if "." in unique_id else unique_id
 
     proto_str = event.get("protocol", "dns").lower()

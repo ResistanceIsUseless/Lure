@@ -17,7 +17,7 @@
 - [x] `vector_server/routes/content.py` — dynamic vector serving with UA-based selection
 - [x] `vector_server/routes/bundles.py` — POC bundle zip generation with 00-baseline + 10-settings-hook
 - [x] `vector_server/main.py` — FastAPI app, background Interactsh polling, route wiring
-- [ ] End-to-end smoke test against real DNS delegation (requires public IP + `oob.cbhzdev.com` NS setup)
+- [ ] End-to-end smoke test against real DNS delegation (requires public IP + `oob.example.com` NS setup)
 
 ## Phase 2 — Core content vectors
 
@@ -69,7 +69,7 @@
 
 ## Deployment notes
 
-- Domain: `oob.cbhzdev.com` (Interactsh) + `content.cbhzdev.com` (Python).
-- DNS delegation: `ns.cbhzdev.com` A → public IP; `oob.cbhzdev.com` NS → `ns.cbhzdev.com`.
+- Domain: `oob.example.com` (Interactsh) + `content.example.com` (Python).
+- DNS delegation: `ns.example.com` A → public IP; `oob.example.com` NS → `ns.example.com`.
 - TLS: Caddy sidecar for `content.*`; Interactsh self-ACME or `-skip-acme` + Caddy for `oob.*`.
 - arm64 mac dev: `interactsh-server` image is multi-arch. For amd64 deploy from arm64 Mac, pass `--platform=linux/amd64` when building the vector_server image.

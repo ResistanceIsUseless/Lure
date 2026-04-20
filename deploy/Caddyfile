@@ -1,14 +1,14 @@
 {
-	email {$ACME_EMAIL:admin@cbhzdev.com}
+	email {$ACME_EMAIL:admin@example.com}
 }
 
 # Content domain — Python vector server
-{$CONTENT_DOMAIN:content.cbhzdev.com} {
+{$CONTENT_DOMAIN:content.example.com} {
 	reverse_proxy 127.0.0.1:8443
 }
 
 # OOB domain — Interactsh handles its own DNS; Caddy fronts HTTP(S)
-*.{$OOB_DOMAIN:oob.cbhzdev.com} {
+*.{$OOB_DOMAIN:oob.example.com} {
 	tls {
 		dns cloudflare {$CF_API_TOKEN}
 	}
