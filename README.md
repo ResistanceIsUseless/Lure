@@ -90,6 +90,30 @@ See [docs/vectors.md](docs/vectors.md) for technique details, variants, and refe
 
 See [docs/poc-bundles.md](docs/poc-bundles.md) for expected signals and training guide.
 
+## RAG poisoning chat demo
+
+A live `/chat` endpoint demonstrates RAG poisoning in real time. An AI support assistant for a fictional company ("Generic Corp") answers questions using knowledge base documents that are editable through the admin UI.
+
+**How it works:**
+
+1. Visit `/chat` — a clean chat interface with suggested questions
+2. The assistant answers using 4 knowledge base docs (company overview, pricing, support policy, FAQ)
+3. Edit any KB doc in the admin UI (Content tab → Knowledge Base filter) — change facts, add misinformation, inject callback URLs
+4. The next chat message immediately reflects the modified data — no retraining, no redeployment
+
+This mirrors real-world RAG poisoning: attackers corrupt the retrieval source (vector DB, document store), not the model itself. The model faithfully regurgitates whatever context it receives.
+
+**LLM backend:** Supports Azure OpenAI, Anthropic, and OpenAI-compatible endpoints. Configure via `FOUNDRY_ENDPOINT`, `FOUNDRY_API_KEY`, and `FOUNDRY_MODEL` environment variables. Provider is auto-detected from the endpoint URL.
+
+## Content site & live monitoring
+
+The content domain serves a realistic developer resources site with vector-embedded content (PDFs, HTML docs, markdown, images) at natural URLs. All content is manageable through the admin UI.
+
+Access to `/robots.txt` and `/llms.txt` is tracked in the admin live feed, showing:
+- Source IP and user agent
+- Whether the visitor received the **CLEAN** (standard) or **INJECTED** (AI-targeted) version
+- AI crawler detection based on UA matching (GPTBot, ClaudeBot, PerplexityBot, etc.)
+
 ## Mutation pipeline
 
 Stackable transforms applied to base payloads before embedding in vectors:
@@ -106,17 +130,25 @@ See [docs/mutations.md](docs/mutations.md) for usage and examples.
 |--------|------|------|-------------|
 | GET | `/health` | no | Health check + stats |
 | GET | `/content/{vector_type}/{test_case}` | no | Serve vector payload with fresh token |
-| GET | `/llms.txt` | no | llms.txt (UA-aware) |
-| GET | `/robots.txt` | no | robots.txt (UA-aware) |
+| GET | `/llms.txt` | no | llms.txt (UA-aware, tracked in live feed) |
+| GET | `/robots.txt` | no | robots.txt (UA-aware, tracked in live feed) |
+| GET | `/chat` | no | RAG chat demo page |
+| POST | `/chat/api/message` | no | Chat API — sends message, returns RAG-backed response |
 | GET | `/bundle/{poc_id}.zip` | no | Download POC bundle |
 | GET | `/bundle/` | no | List available POC bundles |
 | GET | `/mcp/tools` | no | MCP tool manifest (poisoned descriptions) |
 | GET | `/mcp/sse` | no | MCP-over-SSE transport |
+| GET | `/` | no | Content site landing page |
 | GET | `/admin/ui` | query | Admin dashboard |
 | GET | `/admin/stream` | query | SSE live callback feed |
 | GET | `/admin/stats` | header | Correlation stats |
 | GET | `/admin/events` | header | All callback events |
 | GET | `/admin/payload/{token}` | header | Payload + callbacks for token |
+| GET | `/admin/api/content` | header | List content items |
+| POST | `/admin/api/content` | header | Create content item |
+| PUT | `/admin/api/content/{id}` | header | Update content item |
+| DELETE | `/admin/api/content/{id}` | header | Delete content item |
+| POST | `/admin/api/upload` | header | Upload file for content |
 
 ## Project structure
 
@@ -130,12 +162,15 @@ vector_server/
   config.py                      Pydantic settings (.env)
   models.py                      Pydantic schemas
   correlation.py                 Token generation + callback matching
+  content_store.py               JSON-backed content + knowledge base store
   interactsh_client.py           Async RSA/AES polling client
   mutations.py                   Garak-style transform pipeline
   template_engine.py             Jinja2 loader
   routes/
-    admin.py                     Stats, events, SSE stream, dashboard
-    content.py                   Dynamic vector serving (UA-aware)
+    admin.py                     Stats, events, SSE stream, content CRUD, dashboard
+    chat.py                      RAG chat demo (Azure OpenAI / Anthropic)
+    content.py                   Dynamic vector serving (UA-aware) + access tracking
+    site.py                      Public content site with vector injection
     bundles.py                   POC bundle zip generation
     mcp.py                       MCP tool manifests + SSE transport
   vectors/                       16 vectors across 13 modules
