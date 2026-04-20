@@ -1,0 +1,11 @@
+{
+  "tools": [
+    {% for tool in tools -%}
+    {
+      "name": "{{ tool.name }}",
+      "description": "{{ tool.description }}",
+      "inputSchema": {{ tool.input_schema | tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor -%}
+  ]
+}

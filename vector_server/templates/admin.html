@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lure — Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: #0d1117; color: #c9d1d9; padding: 1rem;
+        }
+        h1 { color: #58a6ff; margin-bottom: 0.5rem; font-size: 1.3rem; }
+        .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 1.5rem; }
+
+        /* Stats bar */
+        .stats {
+            display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+        }
+        .stat-card {
+            background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+            padding: 0.75rem 1rem; min-width: 140px;
+        }
+        .stat-card .label { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; }
+        .stat-card .value { color: #58a6ff; font-size: 1.5rem; font-weight: bold; margin-top: 0.25rem; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 1px solid #30363d; }
+        .tab {
+            padding: 0.5rem 1rem; cursor: pointer; color: #8b949e;
+            border-bottom: 2px solid transparent; font-size: 0.85rem;
+        }
+        .tab:hover { color: #c9d1d9; }
+        .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+
+        /* Feed */
+        .feed { max-height: 70vh; overflow-y: auto; }
+        .event {
+            background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+            padding: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem;
+            animation: fadeIn 0.3s ease-in;
+        }
+        .event.matched { border-left: 3px solid #3fb950; }
+        .event.unmatched { border-left: 3px solid #f85149; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+        .event-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 0.4rem;
+        }
+        .event-time { color: #8b949e; font-size: 0.75rem; }
+        .event-proto {
+            display: inline-block; padding: 1px 6px; border-radius: 3px;
+            font-size: 0.7rem; font-weight: bold; text-transform: uppercase;
+        }
+        .proto-dns { background: #1f3a5f; color: #58a6ff; }
+        .proto-http { background: #2a1f3f; color: #bc8cff; }
+        .proto-smtp { background: #3f2a1f; color: #f0883e; }
+
+        .event-token { color: #f0883e; }
+        .event-vector { color: #3fb950; }
+        .event-ip { color: #8b949e; }
+        .event-detail { color: #8b949e; margin-top: 0.3rem; font-size: 0.75rem; word-break: break-all; }
+
+        /* Bundles table */
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th { text-align: left; color: #8b949e; padding: 0.5rem; border-bottom: 1px solid #30363d; }
+        td { padding: 0.5rem; border-bottom: 1px solid #21262d; }
+        td a { color: #58a6ff; text-decoration: none; }
+        td a:hover { text-decoration: underline; }
+        .tier-t1 { color: #f85149; font-weight: bold; }
+        .tier-t2 { color: #f0883e; font-weight: bold; }
+
+        .hidden { display: none; }
+        .connection-status {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        .connected { background: #3fb950; }
+        .disconnected { background: #f85149; }
+    </style>
+</head>
+<body>
+    <h1><span class="connection-status disconnected" id="conn-dot"></span>Lure</h1>
+    <p class="subtitle">LLM prompt injection testing server</p>
+
+    <div class="stats" id="stats">
+        <div class="stat-card">
+            <div class="label">Payloads</div>
+            <div class="value" id="stat-payloads">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Callbacks</div>
+            <div class="value" id="stat-callbacks">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Matched</div>
+            <div class="value" id="stat-matched">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Unmatched</div>
+            <div class="value" id="stat-unmatched">—</div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="feed">Live Feed</div>
+        <div class="tab" data-tab="bundles">POC Bundles</div>
+    </div>
+
+    <div id="tab-feed" class="feed"></div>
+
+    <div id="tab-bundles" class="hidden">
+        <table>
+            <thead>
+                <tr><th>POC</th><th>Target</th><th>Description</th><th>Download</th></tr>
+            </thead>
+            <tbody id="bundles-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+        const AUTH = 'Bearer ' + TOKEN;
+        const BASE = window.location.origin;
+
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-feed').classList.toggle('hidden', tab.dataset.tab !== 'feed');
+                document.getElementById('tab-bundles').classList.toggle('hidden', tab.dataset.tab !== 'bundles');
+            });
+        });
+
+        // Format timestamp
+        function fmtTime(ts) {
+            return new Date(ts * 1000).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        // Render a callback event
+        function renderEvent(evt) {
+            const cb = evt.callback;
+            const pl = evt.payload;
+            const matched = pl !== null;
+            const div = document.createElement('div');
+            div.className = `event ${matched ? 'matched' : 'unmatched'}`;
+            const proto = cb.protocol || 'http';
+            const protoClass = `proto-${proto}`;
+            div.innerHTML = `
+                <div class="event-header">
+                    <span>
+                        <span class="event-proto ${protoClass}">${proto}</span>
+                        <span class="event-token">${cb.token.substring(0, 12)}…</span>
+                        ${matched ? `<span class="event-vector">${pl.vector_type}</span>` : '<span style="color:#f85149">unmatched</span>'}
+                    </span>
+                    <span class="event-time">${fmtTime(cb.received_at)}</span>
+                </div>
+                ${matched ? `<div>test: <strong>${pl.test_case || '—'}</strong> · session: ${pl.session_id}</div>` : ''}
+                <div class="event-ip">from ${cb.source_ip || 'unknown'}${cb.url_path ? ' · ' + cb.url_path : ''}</div>
+                ${cb.raw_data ? `<div class="event-detail">${cb.raw_data.substring(0, 200)}</div>` : ''}
+            `;
+            return div;
+        }
+
+        // Stats polling
+        async function refreshStats() {
+            try {
+                const resp = await fetch(BASE + '/admin/stats', { headers: { 'Authorization': AUTH } });
+                if (!resp.ok) return;
+                const s = await resp.json();
+                document.getElementById('stat-payloads').textContent = s.registered_payloads;
+                document.getElementById('stat-callbacks').textContent = s.total_callbacks;
+                document.getElementById('stat-matched').textContent = s.matched_tokens;
+                document.getElementById('stat-unmatched').textContent = s.unmatched_tokens;
+            } catch (e) { /* ignore */ }
+        }
+
+        // SSE live feed
+        function connectSSE() {
+            const dot = document.getElementById('conn-dot');
+            const es = new EventSource(BASE + '/admin/stream?token=' + encodeURIComponent(TOKEN));
+            es.onopen = () => { dot.className = 'connection-status connected'; };
+            es.onerror = () => {
+                dot.className = 'connection-status disconnected';
+                es.close();
+                setTimeout(connectSSE, 3000);
+            };
+            es.onmessage = (e) => {
+                const evt = JSON.parse(e.data);
+                const feed = document.getElementById('tab-feed');
+                feed.prepend(renderEvent(evt));
+                // Cap at 200 items
+                while (feed.children.length > 200) feed.lastChild.remove();
+                refreshStats();
+            };
+        }
+
+        // Load initial events + bundles
+        async function init() {
+            // Events
+            try {
+                const resp = await fetch(BASE + '/admin/events', { headers: { 'Authorization': AUTH } });
+                if (resp.ok) {
+                    const events = await resp.json();
+                    const feed = document.getElementById('tab-feed');
+                    events.reverse().forEach(evt => feed.prepend(renderEvent(evt)));
+                }
+            } catch (e) { /* ignore */ }
+
+            // Bundles
+            try {
+                const resp = await fetch(BASE + '/bundle/');
+                if (resp.ok) {
+                    const bundles = await resp.json();
+                    const tbody = document.getElementById('bundles-body');
+                    bundles.forEach(b => {
+                        const tier = b.description.includes('T1') ? 'tier-t1' : b.description.includes('T2') ? 'tier-t2' : '';
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><code>${b.poc_id}</code></td>
+                            <td>${b.target_tool}</td>
+                            <td><span class="${tier}">${b.description}</span></td>
+                            <td><a href="/bundle/${b.poc_id}.zip">download</a></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (e) { /* ignore */ }
+
+            refreshStats();
+            connectSSE();
+            setInterval(refreshStats, 10000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

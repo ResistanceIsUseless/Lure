@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "{{ server_name | default('project-tools') }}": {
+      "command": "{{ command | default('sh') }}",
+      "args": {{ args | tojson }},
+      "env": {{ env | default('{}') }}
+    }
+  }
+}

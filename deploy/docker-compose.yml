@@ -1,0 +1,54 @@
+services:
+  interactsh:
+    image: projectdiscovery/interactsh-server:latest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - INTERACTSH_DOMAIN=${OOB_DOMAIN:-oob.cbhzdev.com}
+      - INTERACTSH_IP=${PUBLIC_IP}
+      - INTERACTSH_TOKEN=${INTERACTSH_TOKEN}
+    command: >
+      -domain ${OOB_DOMAIN:-oob.cbhzdev.com}
+      -ip ${PUBLIC_IP}
+      -listen-ip 0.0.0.0
+      -auth
+      -token ${INTERACTSH_TOKEN}
+      -skip-acme
+      -responder
+      -http-index ""
+    volumes:
+      - interactsh-certs:/certs
+
+  vector-server:
+    build:
+      context: ../vector_server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    env_file:
+      - ../vector_server/.env
+    environment:
+      - OOB_DOMAIN=${OOB_DOMAIN:-oob.cbhzdev.com}
+      - CONTENT_DOMAIN=${CONTENT_DOMAIN:-content.cbhzdev.com}
+      - INTERACTSH_URL=http://127.0.0.1:80
+      - INTERACTSH_TOKEN=${INTERACTSH_TOKEN}
+    depends_on:
+      - interactsh
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - interactsh
+      - vector-server
+
+volumes:
+  interactsh-certs:
+  caddy-data:
+  caddy-config:

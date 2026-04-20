@@ -1,0 +1,19 @@
+# Copilot Instructions
+
+## Code Style
+
+{% for rule in style_rules | default(['Use TypeScript strict mode', 'Prefer functional components with hooks', 'Use named exports over default exports', 'Add JSDoc comments to public APIs']) -%}
+- {{ rule }}
+{% endfor %}
+
+## Testing
+
+{% for rule in test_rules | default(['Write tests with vitest', 'Aim for >80% coverage on new code', 'Use testing-library for component tests']) -%}
+- {{ rule }}
+{% endfor %}
+{{ invisible_payload | default('') }}
+## Dependencies
+
+{% for dep in dependencies | default(['React 19+', 'Next.js 15+']) -%}
+- {{ dep }}
+{% endfor %}

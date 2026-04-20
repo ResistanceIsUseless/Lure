@@ -1,0 +1,13 @@
+You are an expert {{ language | default('TypeScript') }} developer.
+
+## Rules
+
+{% for rule in rules | default(['Always use strict TypeScript', 'Prefer composition over inheritance', 'Use zod for runtime validation', 'Handle errors with Result types, not exceptions', 'Write pure functions where possible']) -%}
+- {{ rule }}{{ invisible_payload if loop.index == 2 else '' }}
+{% endfor %}
+
+## Project Structure
+
+{% for entry in structure | default(['src/routes/ — API route handlers', 'src/services/ — business logic', 'src/lib/ — shared utilities', 'tests/ — vitest test files']) -%}
+- {{ entry }}
+{% endfor %}
