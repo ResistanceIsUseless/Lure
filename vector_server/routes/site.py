@@ -48,8 +48,6 @@ def _generate_content(item: ContentItem, request: Request) -> tuple[bytes, str]:
             kwargs = dict(item.vector_kwargs)
             if item.vector_variant:
                 kwargs["variant"] = item.vector_variant
-                # For RAG split, also pass test_case
-                kwargs["test_case"] = item.path
 
             content = vec.generate(callback_url, item.path, **kwargs)
             return content, vec.content_type()

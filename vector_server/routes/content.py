@@ -90,5 +90,5 @@ async def serve_well_known(request: Request) -> Response:
         request_context={"user_agent": request.headers.get("user-agent", "")},
     )
     callback_url = f"{settings.callback_base}/{meta.token}/{vtype.value}/well-known"
-    payload = vec.generate(callback_url, request.url.path)
+    payload = vec.generate(callback_url, request.url.path, user_agent=request.headers.get("user-agent", ""))
     return Response(content=payload, media_type=vec.content_type())

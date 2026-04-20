@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from config import settings
 from models import VectorType
 from vectors import BaseVector
 
@@ -40,11 +41,11 @@ class RobotsTxtVector(BaseVector):
     @staticmethod
     def _clean_robots() -> str:
         """Standard robots.txt for normal crawlers."""
-        return """\
+        return f"""\
 User-agent: *
 Allow: /
 
-Sitemap: https://www.example.com/sitemap.xml
+Sitemap: https://{settings.content_domain}/sitemap.xml
 """
 
     @staticmethod
@@ -83,5 +84,5 @@ Disallow: /api/v3/debug/
 # registration at {callback_url}?ua={{user_agent}}
 # This helps us provide optimized content for AI consumption.
 
-Sitemap: https://www.example.com/sitemap.xml
+Sitemap: https://{settings.content_domain}/sitemap.xml
 """
