@@ -157,6 +157,7 @@
             padding: 0.5rem; border-radius: 4px; font-family: inherit; font-size: 0.85rem;
         }
         .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-group textarea.kb-edit { min-height: 300px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; line-height: 1.5; }
         .form-row { display: flex; gap: 0.75rem; }
         .form-row .form-group { flex: 1; }
         .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
@@ -210,6 +211,7 @@
             <button class="btn" onclick="openUploadModal()">Upload File</button>
             <select class="filter-select" id="content-filter" onchange="loadContent()">
                 <option value="">All Categories</option>
+                <option value="knowledge-base">Knowledge Base</option>
                 <option value="docs">Docs</option>
                 <option value="training-content">Training Content</option>
                 <option value="resources">Resources</option>
@@ -241,6 +243,7 @@
                 <div class="form-group">
                     <label>Category</label>
                     <select id="field-category">
+                        <option value="knowledge-base">Knowledge Base</option>
                         <option value="docs">Docs</option>
                         <option value="training-content">Training Content</option>
                         <option value="resources">Resources</option>
@@ -532,6 +535,12 @@
                         `;
                     }
 
+                    // Show content preview for KB items
+                    const isKB = item.category === 'knowledge-base';
+                    const contentPreview = isKB && item.inline_content
+                        ? `<div style="margin-top:0.5rem;padding:0.5rem;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:0.75rem;color:#8b949e;white-space:pre-wrap;max-height:120px;overflow-y:auto;line-height:1.4;font-family:monospace;">${item.inline_content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`
+                        : '';
+
                     div.innerHTML = `
                         <div style="display:flex;justify-content:space-between;align-items:center;">
                             <div class="content-info">
@@ -553,6 +562,7 @@
                                 <button class="btn btn-danger" onclick="deleteContent('${item.id}')">Delete</button>
                             </div>
                         </div>
+                        ${contentPreview}
                         ${promptsHtml}
                     `;
                     list.appendChild(div);
@@ -581,7 +591,8 @@
                 const resp = await fetch(`${BASE}/admin/api/content/${id}`, { headers: { 'Authorization': AUTH } });
                 if (!resp.ok) return;
                 const item = await resp.json();
-                document.getElementById('modal-title').textContent = 'Edit Content Item';
+                const isKB = item.category === 'knowledge-base';
+                document.getElementById('modal-title').textContent = isKB ? 'Edit Knowledge Base Document' : 'Edit Content Item';
                 document.getElementById('edit-id').value = item.id;
                 document.getElementById('field-path').value = item.path;
                 document.getElementById('field-title').value = item.title;
@@ -589,7 +600,9 @@
                 document.getElementById('field-category').value = item.category;
                 document.getElementById('field-content-type').value = item.content_type;
                 document.getElementById('field-filename').value = item.filename || '';
-                document.getElementById('field-inline').value = item.inline_content || '';
+                const inlineEl = document.getElementById('field-inline');
+                inlineEl.value = item.inline_content || '';
+                inlineEl.classList.toggle('kb-edit', isKB);
                 document.getElementById('field-vector-enabled').checked = item.vector_enabled;
                 document.getElementById('field-vector-type').value = item.vector_type || '';
                 document.getElementById('field-vector-variant').value = item.vector_variant || '';

@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # Admin
     admin_token: str = "changeme"
 
+    # Azure AI Foundry
+    foundry_endpoint: str = ""  # e.g. https://my-model.eastus.models.ai.azure.com
+    foundry_api_key: str = ""
+    foundry_model: str = ""  # optional — some endpoints require model name
+
     @property
     def callback_base(self) -> str:
         return f"https://{self.oob_domain}"

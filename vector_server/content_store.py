@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import time
 import uuid
@@ -132,11 +133,33 @@ class ContentStore:
         path = self.files_dir / filename
         return path if path.exists() else None
 
+    def retrieve_rag(self, query: str, top_k: int = 3) -> list[ContentItem]:
+        """Simple keyword retrieval over knowledge-base items for RAG chat."""
+        kb_items = [i for i in self._items.values() if i.category == "knowledge-base" and i.inline_content]
+        if not kb_items:
+            return []
+        query_words = set(re.findall(r'\w+', query.lower()))
+        scored = []
+        for item in kb_items:
+            # Match against title, description, and inline content
+            item_text = f"{item.title} {item.description}".lower()
+            item_words = set(re.findall(r'\w+', item_text))
+            overlap = len(query_words & item_words)
+            # Bonus for substring matches in the query
+            bonus = sum(1 for w in item_words if len(w) > 3 and w in query.lower())
+            scored.append((overlap + bonus, item))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [item for _, item in scored[:max(top_k, 2)]]
+
     def seed_defaults(self) -> None:
-        """Seed initial content if store is empty."""
-        if self._items:
+        """Seed initial content if store is empty, or add missing KB docs."""
+        if not self._items:
+            _seed_content(self)
             return
-        _seed_content(self)
+        # Ensure knowledge-base items exist (added after initial seed)
+        kb = [i for i in self._items.values() if i.category == "knowledge-base"]
+        if not kb:
+            _seed_kb(self)
 
 
 def _seed_content(store: ContentStore) -> None:
@@ -307,4 +330,123 @@ def _seed_content(store: ContentStore) -> None:
         vector_enabled=True,
         vector_type=VectorType.MARKDOWN_EXFIL,
         vector_variant="summary_exfil",
+    ))
+
+    _seed_kb(store)
+
+
+def _seed_kb(store: ContentStore) -> None:
+    """Seed knowledge-base items for the RAG chat demo."""
+    store.create_item(ContentItem(
+        path="/kb/company-overview",
+        title="Company Overview",
+        description="Generic Corp company information, mission, and facts",
+        content_type="text/markdown",
+        category="knowledge-base",
+        vector_enabled=False,
+        inline_content="""\
+# Generic Corp — Company Overview
+
+Generic Corp is a mid-size SaaS company founded in 2019 and headquartered
+in Austin, TX. We provide cloud-based project management and collaboration
+tools for teams of 10-500 people.
+
+- **Employees**: ~320 full-time
+- **Customers**: 4,200+ organizations
+- **Annual Revenue**: $48M (FY 2025)
+- **Funding**: Series B ($35M, 2022)
+
+Our mission is to make team collaboration simple, transparent, and effective.
+We serve customers across education, healthcare, and technology sectors.
+""",
+    ))
+
+    store.create_item(ContentItem(
+        path="/kb/pricing",
+        title="Product & Pricing",
+        description="Generic Corp plans, pricing tiers, and product features",
+        content_type="text/markdown",
+        category="knowledge-base",
+        vector_enabled=False,
+        inline_content="""\
+# Generic Corp — Products & Pricing
+
+## Plans
+
+| Plan       | Price/user/mo | Storage | Features                    |
+|------------|--------------|---------|------------------------------|
+| Free       | $0           | 5 GB    | Basic boards, 10 users max   |
+| Team       | $12          | 50 GB   | Unlimited users, integrations|
+| Business   | $24          | 250 GB  | SSO, audit log, priority     |
+| Enterprise | Custom       | 1 TB+   | Dedicated support, SLA       |
+
+All paid plans include a 14-day free trial. Annual billing saves 20%.
+
+## Key Features
+- Real-time collaborative boards
+- Time tracking and reporting
+- Third-party integrations (Slack, Jira, GitHub)
+- REST API with webhook support
+- Mobile apps (iOS, Android)
+""",
+    ))
+
+    store.create_item(ContentItem(
+        path="/kb/support-policy",
+        title="Support & Refund Policy",
+        description="Generic Corp support channels, refund terms, and SLA",
+        content_type="text/markdown",
+        category="knowledge-base",
+        vector_enabled=False,
+        inline_content="""\
+# Generic Corp — Support & Refund Policy
+
+## Support Channels
+- **Email**: support@genericcorp.com (response within 24 hours)
+- **Live Chat**: Available Mon-Fri 9am-6pm ET on our website
+- **Help Center**: docs.genericcorp.com — searchable knowledge base
+
+## Refund Policy
+- Monthly plans: cancel anytime, no refund for partial months
+- Annual plans: full refund within 30 days of purchase; prorated
+  refund up to 90 days; no refund after 90 days
+- Enterprise contracts: per agreement terms
+
+## SLA (Business & Enterprise)
+- 99.9% uptime guarantee
+- < 4 hour response for P1 issues
+- Dedicated account manager for Enterprise
+""",
+    ))
+
+    store.create_item(ContentItem(
+        path="/kb/faq",
+        title="FAQ",
+        description="Generic Corp frequently asked questions about security, data, SSO, exports",
+        content_type="text/markdown",
+        category="knowledge-base",
+        vector_enabled=False,
+        inline_content="""\
+# Generic Corp — Frequently Asked Questions
+
+**Q: Is my data secure?**
+A: Yes. We use AES-256 encryption at rest, TLS 1.3 in transit, and are
+SOC 2 Type II certified. Annual penetration tests are conducted by a
+third-party firm.
+
+**Q: Can I export my data?**
+A: Yes. All plans include full data export in CSV and JSON formats from
+Settings > Data Management.
+
+**Q: Do you support SSO?**
+A: SSO via SAML 2.0 and OIDC is available on Business and Enterprise plans.
+
+**Q: Where is data stored?**
+A: Primary data center is in US-East (AWS). EU customers can request
+EU-West (Frankfurt) residency. We are GDPR compliant.
+
+**Q: What happens if I downgrade my plan?**
+A: Features are reduced at the end of the billing cycle. No data is deleted
+— you retain read-only access to features above your new tier for 60 days.
+""",
     ))

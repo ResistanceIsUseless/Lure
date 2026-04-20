@@ -27,12 +27,17 @@ services:
     ports:
       - "8443:8443"
     env_file:
-      - ../vector_server/.env
+      - path: ../vector_server/.env
+        required: false
     environment:
       - OOB_DOMAIN=${OOB_DOMAIN:-oob.example.com}
       - CONTENT_DOMAIN=${CONTENT_DOMAIN:-content.example.com}
       - INTERACTSH_URL=http://127.0.0.1:80
       - INTERACTSH_TOKEN=${INTERACTSH_TOKEN}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-changeme}
+      - FOUNDRY_ENDPOINT=${FOUNDRY_ENDPOINT:-}
+      - FOUNDRY_API_KEY=${FOUNDRY_API_KEY:-}
+      - FOUNDRY_MODEL=${FOUNDRY_MODEL:-}
     depends_on:
       - interactsh
 

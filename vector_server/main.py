@@ -17,7 +17,7 @@ from content_store import ContentStore
 from correlation import CorrelationEngine
 from interactsh_client import InteractshClient
 from models import Protocol
-from routes import admin, bundles, content, mcp, site
+from routes import admin, bundles, chat, content, mcp, site
 
 # Ensure vector modules are imported so they register with the registry
 import vectors.agent_config  # noqa: F401
@@ -68,10 +68,12 @@ admin.set_store(content_store)
 content.set_engine(engine)
 bundles.set_engine(engine)
 mcp.set_engine(engine)
+chat.set_store(content_store)
 site.set_engine(engine)
 site.set_store(content_store)
 
 app.include_router(admin.router)
+app.include_router(chat.router)
 app.include_router(content.router)
 app.include_router(bundles.router)
 app.include_router(mcp.router)
