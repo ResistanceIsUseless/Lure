@@ -1,0 +1,68 @@
+#cloud-config
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - git
+  - jq
+
+write_files:
+  - path: /opt/lure/docker-compose.yml
+    permissions: "0644"
+    content: |
+      ${docker_compose}
+
+  - path: /opt/lure/Caddyfile
+    permissions: "0644"
+    content: |
+      ${caddyfile}
+
+  - path: /opt/lure/.env
+    permissions: "0600"
+    content: |
+      OOB_DOMAIN=${oob_domain}
+      CONTENT_DOMAIN=${content_domain}
+      PUBLIC_IP=${public_ip}
+      INTERACTSH_URL=http://127.0.0.1:80
+      INTERACTSH_TOKEN=${interactsh_token}
+      ADMIN_TOKEN=${admin_token}
+
+runcmd:
+  # Install Docker
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  - systemctl enable docker
+  - systemctl start docker
+  - usermod -aG docker ${admin_username}
+
+  # Clone repo and build vector server
+  - git clone https://github.com/ResistanceIsUseless/Lure.git /opt/lure/repo
+  - cp /opt/lure/.env /opt/lure/repo/vector_server/.env
+
+  # Update docker-compose to use the cloned repo context
+  - cd /opt/lure/repo/deploy
+  - cp /opt/lure/Caddyfile /opt/lure/repo/deploy/Caddyfile
+  - |
+    export OOB_DOMAIN="${oob_domain}"
+    export CONTENT_DOMAIN="${content_domain}"
+    export PUBLIC_IP="${public_ip}"
+    export INTERACTSH_TOKEN="${interactsh_token}"
+    docker compose up -d --build
+
+  # Disable systemd-resolved to free port 53 for Interactsh
+  - systemctl disable systemd-resolved
+  - systemctl stop systemd-resolved
+  - rm -f /etc/resolv.conf
+  - echo "nameserver 8.8.8.8" > /etc/resolv.conf
+  - echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
+  # Restart containers after freeing port 53
+  - cd /opt/lure/repo/deploy && docker compose restart interactsh

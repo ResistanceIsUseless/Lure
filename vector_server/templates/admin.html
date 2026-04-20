@@ -14,9 +14,7 @@
         .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 1.5rem; }
 
         /* Stats bar */
-        .stats {
-            display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;
-        }
+        .stats { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
         .stat-card {
             background: #161b22; border: 1px solid #30363d; border-radius: 6px;
             padding: 0.75rem 1rem; min-width: 140px;
@@ -44,10 +42,7 @@
         .event.unmatched { border-left: 3px solid #f85149; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
-        .event-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 0.4rem;
-        }
+        .event-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
         .event-time { color: #8b949e; font-size: 0.75rem; }
         .event-proto {
             display: inline-block; padding: 1px 6px; border-radius: 3px;
@@ -56,13 +51,12 @@
         .proto-dns { background: #1f3a5f; color: #58a6ff; }
         .proto-http { background: #2a1f3f; color: #bc8cff; }
         .proto-smtp { background: #3f2a1f; color: #f0883e; }
-
         .event-token { color: #f0883e; }
         .event-vector { color: #3fb950; }
         .event-ip { color: #8b949e; }
         .event-detail { color: #8b949e; margin-top: 0.3rem; font-size: 0.75rem; word-break: break-all; }
 
-        /* Bundles table */
+        /* Tables */
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
         th { text-align: left; color: #8b949e; padding: 0.5rem; border-bottom: 1px solid #30363d; }
         td { padding: 0.5rem; border-bottom: 1px solid #21262d; }
@@ -73,11 +67,78 @@
 
         .hidden { display: none; }
         .connection-status {
-            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-            margin-right: 0.5rem;
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.5rem;
         }
         .connected { background: #3fb950; }
         .disconnected { background: #f85149; }
+
+        /* Content management */
+        .content-toolbar {
+            display: flex; gap: 0.75rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;
+        }
+        .btn {
+            background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 0.4rem 0.8rem;
+            border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-family: inherit;
+        }
+        .btn:hover { background: #30363d; }
+        .btn-primary { background: #238636; border-color: #2ea043; color: white; }
+        .btn-primary:hover { background: #2ea043; }
+        .btn-danger { background: #da3633; border-color: #f85149; color: white; }
+        .btn-danger:hover { background: #f85149; }
+
+        .content-card {
+            background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+            padding: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .content-card .content-info { flex: 1; }
+        .content-card .content-path { color: #58a6ff; font-size: 0.85rem; margin-bottom: 0.25rem; }
+        .content-card .content-title { color: #c9d1d9; margin-bottom: 0.2rem; }
+        .content-card .content-meta { color: #8b949e; font-size: 0.75rem; }
+        .content-card .content-actions { display: flex; gap: 0.5rem; }
+
+        .vector-badge {
+            display: inline-block; padding: 1px 6px; border-radius: 3px;
+            font-size: 0.7rem; font-weight: bold;
+        }
+        .vector-on { background: #1a3a1a; color: #3fb950; }
+        .vector-off { background: #3a1a1a; color: #f85149; }
+        .cat-badge {
+            display: inline-block; padding: 1px 6px; border-radius: 3px;
+            font-size: 0.7rem; background: #1f2a3f; color: #79c0ff;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            padding: 1.5rem; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+        }
+        .modal h2 { color: #58a6ff; font-size: 1.1rem; margin-bottom: 1rem; }
+        .form-group { margin-bottom: 0.75rem; }
+        .form-group label {
+            display: block; color: #8b949e; font-size: 0.75rem;
+            text-transform: uppercase; margin-bottom: 0.25rem;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
+            padding: 0.5rem; border-radius: 4px; font-family: inherit; font-size: 0.85rem;
+        }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-row { display: flex; gap: 0.75rem; }
+        .form-row .form-group { flex: 1; }
+        .form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+        .toggle-row { display: flex; align-items: center; gap: 0.5rem; }
+        .toggle-row input[type=checkbox] { width: auto; }
+
+        .filter-select {
+            background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
+            padding: 0.4rem 0.6rem; border-radius: 4px; font-family: inherit; font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
@@ -101,14 +162,34 @@
             <div class="label">Unmatched</div>
             <div class="value" id="stat-unmatched">—</div>
         </div>
+        <div class="stat-card">
+            <div class="label">Content Items</div>
+            <div class="value" id="stat-content">—</div>
+        </div>
     </div>
 
     <div class="tabs">
         <div class="tab active" data-tab="feed">Live Feed</div>
+        <div class="tab" data-tab="content">Content</div>
         <div class="tab" data-tab="bundles">POC Bundles</div>
     </div>
 
     <div id="tab-feed" class="feed"></div>
+
+    <div id="tab-content" class="hidden">
+        <div class="content-toolbar">
+            <button class="btn btn-primary" onclick="openCreateModal()">+ New Content</button>
+            <button class="btn" onclick="openUploadModal()">Upload File</button>
+            <select class="filter-select" id="content-filter" onchange="loadContent()">
+                <option value="">All Categories</option>
+                <option value="docs">Docs</option>
+                <option value="training-content">Training Content</option>
+                <option value="resources">Resources</option>
+                <option value="images">Images</option>
+            </select>
+        </div>
+        <div id="content-list"></div>
+    </div>
 
     <div id="tab-bundles" class="hidden">
         <table>
@@ -117,6 +198,104 @@
             </thead>
             <tbody id="bundles-body"></tbody>
         </table>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div class="modal-overlay" id="content-modal">
+        <div class="modal">
+            <h2 id="modal-title">New Content Item</h2>
+            <input type="hidden" id="edit-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>URL Path</label>
+                    <input type="text" id="field-path" placeholder="/docs/my-page">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="field-category">
+                        <option value="docs">Docs</option>
+                        <option value="training-content">Training Content</option>
+                        <option value="resources">Resources</option>
+                        <option value="images">Images</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="field-title" placeholder="Page Title">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <input type="text" id="field-description" placeholder="Brief description">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Content Type</label>
+                    <select id="field-content-type">
+                        <option value="text/html">HTML</option>
+                        <option value="application/pdf">PDF</option>
+                        <option value="text/markdown">Markdown</option>
+                        <option value="image/png">PNG</option>
+                        <option value="image/gif">GIF</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Stored File (optional)</label>
+                    <input type="text" id="field-filename" placeholder="filename from upload">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Inline Content (for text types)</label>
+                <textarea id="field-inline" placeholder="Inline HTML, markdown, etc."></textarea>
+            </div>
+            <hr style="border-color: #30363d; margin: 1rem 0;">
+            <h2 style="font-size: 0.95rem; margin-bottom: 0.75rem;">Vector Injection</h2>
+            <div class="toggle-row form-group">
+                <input type="checkbox" id="field-vector-enabled" checked>
+                <label style="display:inline; text-transform:none;">Enable vector injection</label>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Vector Type</label>
+                    <select id="field-vector-type">
+                        <option value="">None</option>
+                        <option value="html-hidden">HTML Hidden</option>
+                        <option value="pdf-invisible">PDF Invisible Text</option>
+                        <option value="markdown-exfil">Markdown Exfil</option>
+                        <option value="rag-poisoned">RAG Poisoned</option>
+                        <option value="rag-split">RAG Split</option>
+                        <option value="multimodal-img">Multimodal Image</option>
+                        <option value="unicode-tags">Unicode Tags</option>
+                        <option value="llms-txt">llms.txt</option>
+                        <option value="robots-cloak">robots.txt Cloak</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Variant</label>
+                    <input type="text" id="field-vector-variant" placeholder="e.g., render_mode_3, chart_label">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveContent()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal-overlay" id="upload-modal">
+        <div class="modal">
+            <h2>Upload File</h2>
+            <div class="form-group">
+                <label>File</label>
+                <input type="file" id="upload-file" style="color: #c9d1d9;">
+            </div>
+            <div id="upload-result" style="color: #3fb950; font-size: 0.85rem; margin-top: 0.5rem;"></div>
+            <div class="form-actions">
+                <button class="btn" onclick="closeUploadModal()">Close</button>
+                <button class="btn btn-primary" onclick="doUpload()">Upload</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -129,17 +308,17 @@
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                document.getElementById('tab-feed').classList.toggle('hidden', tab.dataset.tab !== 'feed');
-                document.getElementById('tab-bundles').classList.toggle('hidden', tab.dataset.tab !== 'bundles');
+                ['feed', 'content', 'bundles'].forEach(t => {
+                    document.getElementById('tab-' + t).classList.toggle('hidden', tab.dataset.tab !== t);
+                });
+                if (tab.dataset.tab === 'content') loadContent();
             });
         });
 
-        // Format timestamp
         function fmtTime(ts) {
             return new Date(ts * 1000).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
-        // Render a callback event
         function renderEvent(evt) {
             const cb = evt.callback;
             const pl = evt.payload;
@@ -147,12 +326,11 @@
             const div = document.createElement('div');
             div.className = `event ${matched ? 'matched' : 'unmatched'}`;
             const proto = cb.protocol || 'http';
-            const protoClass = `proto-${proto}`;
             div.innerHTML = `
                 <div class="event-header">
                     <span>
-                        <span class="event-proto ${protoClass}">${proto}</span>
-                        <span class="event-token">${cb.token.substring(0, 12)}…</span>
+                        <span class="event-proto proto-${proto}">${proto}</span>
+                        <span class="event-token">${cb.token.substring(0, 12)}...</span>
                         ${matched ? `<span class="event-vector">${pl.vector_type}</span>` : '<span style="color:#f85149">unmatched</span>'}
                     </span>
                     <span class="event-time">${fmtTime(cb.received_at)}</span>
@@ -164,7 +342,7 @@
             return div;
         }
 
-        // Stats polling
+        // Stats
         async function refreshStats() {
             try {
                 const resp = await fetch(BASE + '/admin/stats', { headers: { 'Authorization': AUTH } });
@@ -174,10 +352,18 @@
                 document.getElementById('stat-callbacks').textContent = s.total_callbacks;
                 document.getElementById('stat-matched').textContent = s.matched_tokens;
                 document.getElementById('stat-unmatched').textContent = s.unmatched_tokens;
-            } catch (e) { /* ignore */ }
+            } catch (e) {}
+            // Content count
+            try {
+                const resp = await fetch(BASE + '/admin/api/content', { headers: { 'Authorization': AUTH } });
+                if (resp.ok) {
+                    const items = await resp.json();
+                    document.getElementById('stat-content').textContent = items.length;
+                }
+            } catch (e) {}
         }
 
-        // SSE live feed
+        // SSE
         function connectSSE() {
             const dot = document.getElementById('conn-dot');
             const es = new EventSource(BASE + '/admin/stream?token=' + encodeURIComponent(TOKEN));
@@ -191,15 +377,152 @@
                 const evt = JSON.parse(e.data);
                 const feed = document.getElementById('tab-feed');
                 feed.prepend(renderEvent(evt));
-                // Cap at 200 items
                 while (feed.children.length > 200) feed.lastChild.remove();
                 refreshStats();
             };
         }
 
-        // Load initial events + bundles
+        // --- Content Management ---
+
+        async function loadContent() {
+            const filter = document.getElementById('content-filter').value;
+            const url = filter ? `${BASE}/admin/api/content?category=${filter}` : `${BASE}/admin/api/content`;
+            try {
+                const resp = await fetch(url, { headers: { 'Authorization': AUTH } });
+                if (!resp.ok) return;
+                const items = await resp.json();
+                const list = document.getElementById('content-list');
+                list.innerHTML = '';
+                items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'content-card';
+                    div.innerHTML = `
+                        <div class="content-info">
+                            <div class="content-path">
+                                <a href="${item.path}" target="_blank">${item.path}</a>
+                            </div>
+                            <div class="content-title">${item.title}</div>
+                            <div class="content-meta">
+                                <span class="cat-badge">${item.category}</span>
+                                <span class="vector-badge ${item.vector_enabled ? 'vector-on' : 'vector-off'}">
+                                    ${item.vector_enabled && item.vector_type ? item.vector_type : 'no vector'}
+                                </span>
+                                ${item.vector_variant ? `<span style="color:#8b949e">${item.vector_variant}</span>` : ''}
+                                · ${item.content_type}
+                            </div>
+                        </div>
+                        <div class="content-actions">
+                            <button class="btn" onclick="editContent('${item.id}')">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteContent('${item.id}')">Delete</button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function openCreateModal() {
+            document.getElementById('modal-title').textContent = 'New Content Item';
+            document.getElementById('edit-id').value = '';
+            document.getElementById('field-path').value = '';
+            document.getElementById('field-title').value = '';
+            document.getElementById('field-description').value = '';
+            document.getElementById('field-category').value = 'docs';
+            document.getElementById('field-content-type').value = 'text/html';
+            document.getElementById('field-filename').value = '';
+            document.getElementById('field-inline').value = '';
+            document.getElementById('field-vector-enabled').checked = true;
+            document.getElementById('field-vector-type').value = '';
+            document.getElementById('field-vector-variant').value = '';
+            document.getElementById('content-modal').classList.add('show');
+        }
+
+        async function editContent(id) {
+            try {
+                const resp = await fetch(`${BASE}/admin/api/content/${id}`, { headers: { 'Authorization': AUTH } });
+                if (!resp.ok) return;
+                const item = await resp.json();
+                document.getElementById('modal-title').textContent = 'Edit Content Item';
+                document.getElementById('edit-id').value = item.id;
+                document.getElementById('field-path').value = item.path;
+                document.getElementById('field-title').value = item.title;
+                document.getElementById('field-description').value = item.description;
+                document.getElementById('field-category').value = item.category;
+                document.getElementById('field-content-type').value = item.content_type;
+                document.getElementById('field-filename').value = item.filename || '';
+                document.getElementById('field-inline').value = item.inline_content || '';
+                document.getElementById('field-vector-enabled').checked = item.vector_enabled;
+                document.getElementById('field-vector-type').value = item.vector_type || '';
+                document.getElementById('field-vector-variant').value = item.vector_variant || '';
+                document.getElementById('content-modal').classList.add('show');
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveContent() {
+            const id = document.getElementById('edit-id').value;
+            const data = {
+                path: document.getElementById('field-path').value,
+                title: document.getElementById('field-title').value,
+                description: document.getElementById('field-description').value,
+                category: document.getElementById('field-category').value,
+                content_type: document.getElementById('field-content-type').value,
+                filename: document.getElementById('field-filename').value,
+                inline_content: document.getElementById('field-inline').value,
+                vector_enabled: document.getElementById('field-vector-enabled').checked,
+                vector_type: document.getElementById('field-vector-type').value || null,
+                vector_variant: document.getElementById('field-vector-variant').value,
+            };
+            const url = id ? `${BASE}/admin/api/content/${id}` : `${BASE}/admin/api/content`;
+            const method = id ? 'PUT' : 'POST';
+            try {
+                const resp = await fetch(url, {
+                    method, headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                if (resp.ok) { closeModal(); loadContent(); refreshStats(); }
+                else { alert('Error: ' + (await resp.text())); }
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function deleteContent(id) {
+            if (!confirm('Delete this content item?')) return;
+            try {
+                await fetch(`${BASE}/admin/api/content/${id}`, {
+                    method: 'DELETE', headers: { 'Authorization': AUTH },
+                });
+                loadContent(); refreshStats();
+            } catch (e) { console.error(e); }
+        }
+
+        function closeModal() { document.getElementById('content-modal').classList.remove('show'); }
+
+        // Upload
+        function openUploadModal() {
+            document.getElementById('upload-result').textContent = '';
+            document.getElementById('upload-file').value = '';
+            document.getElementById('upload-modal').classList.add('show');
+        }
+        function closeUploadModal() { document.getElementById('upload-modal').classList.remove('show'); }
+
+        async function doUpload() {
+            const fileInput = document.getElementById('upload-file');
+            if (!fileInput.files.length) return;
+            const form = new FormData();
+            form.append('file', fileInput.files[0]);
+            try {
+                const resp = await fetch(`${BASE}/admin/api/upload`, {
+                    method: 'POST', headers: { 'Authorization': AUTH }, body: form,
+                });
+                if (resp.ok) {
+                    const result = await resp.json();
+                    document.getElementById('upload-result').textContent =
+                        `Uploaded: ${result.filename} (${result.size} bytes). Use this filename in content items.`;
+                } else { alert('Upload failed: ' + (await resp.text())); }
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        // Init
         async function init() {
-            // Events
             try {
                 const resp = await fetch(BASE + '/admin/events', { headers: { 'Authorization': AUTH } });
                 if (resp.ok) {
@@ -207,9 +530,8 @@
                     const feed = document.getElementById('tab-feed');
                     events.reverse().forEach(evt => feed.prepend(renderEvent(evt)));
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) {}
 
-            // Bundles
             try {
                 const resp = await fetch(BASE + '/bundle/');
                 if (resp.ok) {
@@ -227,7 +549,7 @@
                         tbody.appendChild(tr);
                     });
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) {}
 
             refreshStats();
             connectSSE();
