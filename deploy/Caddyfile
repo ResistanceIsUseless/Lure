@@ -1,16 +1,15 @@
 {
-	email {$ACME_EMAIL:admin@example.com}
+	email {$ACME_EMAIL:admin@campuscloud.io}
 }
 
 # Content domain — Python vector server
-{$CONTENT_DOMAIN:content.example.com} {
+{$CONTENT_DOMAIN:content.campuscloud.io} {
 	reverse_proxy 127.0.0.1:8443
 }
 
 # OOB domain — Interactsh handles its own DNS; Caddy fronts HTTP(S)
-*.{$OOB_DOMAIN:oob.example.com} {
-	tls {
-		dns cloudflare {$CF_API_TOKEN}
-	}
+# Wildcard certs require DNS-01 challenge. For now, proxy plain HTTP
+# and let Interactsh handle HTTPS if needed.
+http://*.{$OOB_DOMAIN:oob.campuscloud.io} {
 	reverse_proxy 127.0.0.1:80
 }
