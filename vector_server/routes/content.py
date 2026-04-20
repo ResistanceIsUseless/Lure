@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import re
+import time
 
 from fastapi import APIRouter, Request, Response
 
 from config import settings
 from correlation import CorrelationEngine
-from models import VectorType
+from models import Callback, CallbackEvent, PayloadMeta, Protocol, VectorType
+from routes import admin
 from vectors import get_vector
 
 router = APIRouter(tags=["content"])
@@ -78,6 +80,8 @@ async def serve_vector(vector_type: str, test_case: str, request: Request) -> Re
 async def serve_well_known(request: Request) -> Response:
     """Serve well-known files with vector content based on UA."""
     assert engine is not None
+    ua = request.headers.get("user-agent", "")
+    path = request.url.path
     vtype = _select_vector(request)
     vec = get_vector(vtype)
     if not vec:
@@ -86,9 +90,58 @@ async def serve_well_known(request: Request) -> Response:
     meta = engine.register_payload(
         session_id="well-known",
         vector_type=vtype,
-        test_case=request.url.path,
-        request_context={"user_agent": request.headers.get("user-agent", "")},
+        test_case=path,
+        request_context={"user_agent": ua},
     )
     callback_url = f"{settings.callback_base}/{meta.token}/{vtype.value}/well-known"
-    payload = vec.generate(callback_url, request.url.path, user_agent=request.headers.get("user-agent", ""))
+    payload = vec.generate(callback_url, path, user_agent=ua)
+
+    # Broadcast access to live feed
+    is_ai = bool(_AI_CRAWLER_RE.search(ua))
+    source_ip = request.client.host if request.client else ""
+    _broadcast_site_access(
+        path=path,
+        source_ip=source_ip,
+        user_agent=ua,
+        is_ai_crawler=is_ai,
+        vector_type=vtype,
+        token=meta.token,
+    )
+
     return Response(content=payload, media_type=vec.content_type())
+
+
+def _broadcast_site_access(
+    path: str,
+    source_ip: str,
+    user_agent: str,
+    is_ai_crawler: bool,
+    vector_type: VectorType,
+    token: str,
+) -> None:
+    """Record and broadcast a well-known file access event."""
+    assert engine is not None
+    served = "INJECTED" if is_ai_crawler else "clean"
+
+    # Update the registered payload's test_case to show served status
+    with engine._lock:
+        meta = engine._payloads.get(token)
+        if meta:
+            meta.test_case = f"{path} → {served}"
+            meta.session_id = "site-access"
+            meta.request_context = {
+                "source": "site-access",
+                "user_agent": user_agent,
+                "is_ai_crawler": is_ai_crawler,
+                "served": served,
+            }
+
+    # Record as a callback so it shows in get_all_events and stats
+    event = engine.on_callback(
+        token=token,
+        protocol=Protocol.HTTP,
+        source_ip=source_ip,
+        raw_data=f"UA: {user_agent}",
+        url_path=path,
+    )
+    admin.broadcast_event(event)
