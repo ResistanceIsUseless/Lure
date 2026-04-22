@@ -1,15 +1,25 @@
-"""OOB URL API — lets external tools create callback URLs and poll for hits."""
+"""OOB URL API — lets external tools create callback URLs and poll for hits.
+
+Callback URLs route through the content domain (content.campuscloud.io)
+since it has working DNS + TLS. The /c/{token} endpoint catches inbound
+callbacks and feeds them directly into the correlation engine.
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+import logging
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from config import settings
 from correlation import CorrelationEngine
-from models import VectorType
+from models import Protocol, VectorType
 
-router = APIRouter(prefix="/api/oob", tags=["oob"])
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["oob"])
 
 engine: CorrelationEngine | None = None
 
@@ -55,7 +65,7 @@ class PollResponse(BaseModel):
 # --- routes ---
 
 
-@router.post("/url", response_model=CreateURLResponse, dependencies=[Depends(_require_auth)])
+@router.post("/api/oob/url", response_model=CreateURLResponse, dependencies=[Depends(_require_auth)])
 async def create_url(body: CreateURLRequest) -> CreateURLResponse:
     """Create a new OOB callback URL.  Returns the URL and a poll endpoint."""
     assert engine is not None
@@ -70,7 +80,8 @@ async def create_url(body: CreateURLRequest) -> CreateURLResponse:
         request_context=ctx,
     )
 
-    callback_url = f"{settings.callback_base}/{meta.token}/oob-url/hook"
+    # Route callbacks through the content domain (has working DNS + TLS)
+    callback_url = f"{settings.content_base}/c/{meta.token}"
     dns_hostname = f"{meta.token}.{settings.interactsh_correlation_id}{settings.interactsh_nonce}.{settings.oob_domain}"
 
     return CreateURLResponse(
@@ -81,7 +92,7 @@ async def create_url(body: CreateURLRequest) -> CreateURLResponse:
     )
 
 
-@router.get("/poll/{token}", response_model=PollResponse, dependencies=[Depends(_require_auth)])
+@router.get("/api/oob/poll/{token}", response_model=PollResponse, dependencies=[Depends(_require_auth)])
 async def poll_token(token: str) -> PollResponse:
     """Check whether a callback URL has been triggered."""
     assert engine is not None
@@ -103,4 +114,55 @@ async def poll_token(token: str) -> PollResponse:
         token=token,
         label=meta.test_case,
         hits=hits,
+    )
+
+
+# --- Callback catch endpoint ---
+# Any GET/POST/PUT to /c/{token} or /c/{token}/... records a hit.
+# This replaces the Interactsh OOB domain for HTTP callbacks.
+
+
+@router.get("/c/{token}")
+@router.get("/c/{token}/{path:path}")
+async def catch_callback_get(token: str, request: Request, path: str = "") -> Response:
+    """Catch inbound HTTP GET callbacks and record them."""
+    return _record_callback(token, request, path)
+
+
+@router.post("/c/{token}")
+@router.post("/c/{token}/{path:path}")
+async def catch_callback_post(token: str, request: Request, path: str = "") -> Response:
+    """Catch inbound HTTP POST callbacks and record them."""
+    return _record_callback(token, request, path)
+
+
+def _record_callback(token: str, request: Request, path: str) -> Response:
+    assert engine is not None
+    source_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+    )
+    # Reconstruct raw request line + headers for logging
+    raw_lines = [f"{request.method} /c/{token}/{path} HTTP/1.1" if path else f"{request.method} /c/{token} HTTP/1.1"]
+    for k, v in request.headers.items():
+        raw_lines.append(f"{k}: {v}")
+    raw_data = "\r\n".join(raw_lines) + "\r\n\r\n"
+
+    query = dict(request.query_params)
+
+    from routes.admin import broadcast_event
+    cb_event = engine.on_callback(
+        token=token,
+        protocol=Protocol.HTTP,
+        source_ip=source_ip,
+        raw_data=raw_data,
+        url_path=f"/c/{token}/{path}" if path else f"/c/{token}",
+        query_params=query,
+    )
+    broadcast_event(cb_event)
+
+    # Return a 1x1 transparent pixel (works for img tags too)
+    return Response(
+        content=b"\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00\x21\xf9\x04\x00\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b",
+        media_type="image/gif",
     )
