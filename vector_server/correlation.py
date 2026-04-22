@@ -129,6 +129,17 @@ class CorrelationEngine:
                     events.append(CallbackEvent(callback=cb, payload=meta))
         return events
 
+    def get_payloads_by_session(self, session_id: str) -> list[PayloadMeta]:
+        with self._lock:
+            return [m for m in self._payloads.values() if m.session_id == session_id]
+
+    def delete_payload(self, token: str) -> bool:
+        with self._lock:
+            if token in self._payloads:
+                del self._payloads[token]
+            self._callbacks.pop(token, None)
+            return True
+
     def stats(self) -> dict:
         with self._lock:
             return {

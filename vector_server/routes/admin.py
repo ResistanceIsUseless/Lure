@@ -162,3 +162,44 @@ async def upload_file(file: UploadFile = File(...)) -> dict:
     data = await file.read()
     filename = store.save_file(file.filename or "upload", data)
     return {"filename": filename, "size": len(data)}
+
+
+# ---------------------------------------------------------------------------
+# OOB token management API
+# ---------------------------------------------------------------------------
+
+@router.get("/api/oob-tokens", dependencies=[Depends(_require_auth)])
+async def list_oob_tokens() -> list[dict]:
+    """List all OOB tokens (oob-api and oob-stage2 sessions) with their callbacks."""
+    assert engine is not None
+    tokens = []
+    for sid in ("oob-api", "oob-stage2"):
+        for meta in engine.get_payloads_by_session(sid):
+            cbs = engine.get_callbacks(meta.token)
+            tokens.append({
+                "token": meta.token,
+                "label": meta.test_case,
+                "session_id": meta.session_id,
+                "created_at": meta.created_at,
+                "context": meta.request_context,
+                "hit_count": len(cbs),
+                "hits": [
+                    {
+                        "protocol": cb.protocol,
+                        "source_ip": cb.source_ip,
+                        "raw_data": cb.raw_data[:500],
+                        "received_at": cb.received_at,
+                    }
+                    for cb in cbs
+                ],
+            })
+    tokens.sort(key=lambda t: t["created_at"], reverse=True)
+    return tokens
+
+
+@router.delete("/api/oob-tokens/{token}", dependencies=[Depends(_require_auth)])
+async def delete_oob_token(token: str) -> dict:
+    """Delete an OOB token and its callbacks."""
+    assert engine is not None
+    engine.delete_payload(token)
+    return {"deleted": True}

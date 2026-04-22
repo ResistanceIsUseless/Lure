@@ -196,6 +196,10 @@
             <div class="value" id="stat-unmatched">—</div>
         </div>
         <div class="stat-card">
+            <div class="label">OOB Tokens</div>
+            <div class="value" id="stat-oob">—</div>
+        </div>
+        <div class="stat-card">
             <div class="label">Content Items</div>
             <div class="value" id="stat-content">—</div>
         </div>
@@ -203,11 +207,55 @@
 
     <div class="tabs">
         <div class="tab active" data-tab="feed">Live Feed</div>
+        <div class="tab" data-tab="oob">OOB Tokens</div>
         <div class="tab" data-tab="content">Content</div>
         <div class="tab" data-tab="bundles">POC Bundles</div>
     </div>
 
     <div id="tab-feed" class="feed"></div>
+
+    <div id="tab-oob" class="hidden">
+        <div class="content-toolbar">
+            <button class="btn btn-primary" onclick="openOobModal()">+ New OOB Token</button>
+            <button class="btn" onclick="loadOobTokens()">Refresh</button>
+            <span style="color:#8b949e;font-size:0.8rem;margin-left:0.5rem;" id="oob-count"></span>
+        </div>
+        <div id="oob-list"></div>
+    </div>
+
+    <!-- OOB Create Modal -->
+    <div class="modal-overlay" id="oob-modal">
+        <div class="modal">
+            <h2>Create OOB Token</h2>
+            <div class="form-group">
+                <label>Label</label>
+                <input type="text" id="oob-label" placeholder="e.g., ssrf-test-endpoint-1">
+            </div>
+            <div class="form-group">
+                <label>Metadata (optional, JSON)</label>
+                <textarea id="oob-metadata" placeholder='{"target": "internal-api"}' style="min-height:60px;"></textarea>
+            </div>
+            <div id="oob-create-result" class="hidden" style="margin-top:1rem;">
+                <div style="color:#3fb950;font-size:0.85rem;margin-bottom:0.5rem;">Token created!</div>
+                <div class="form-group">
+                    <label>Callback URL</label>
+                    <input type="text" id="oob-result-url" readonly style="cursor:pointer;" onclick="navigator.clipboard.writeText(this.value);this.style.borderColor='#3fb950';setTimeout(()=>this.style.borderColor='#30363d',1000)">
+                </div>
+                <div class="form-group">
+                    <label>Token</label>
+                    <input type="text" id="oob-result-token" readonly style="cursor:pointer;" onclick="navigator.clipboard.writeText(this.value);this.style.borderColor='#3fb950';setTimeout(()=>this.style.borderColor='#30363d',1000)">
+                </div>
+                <div class="form-group">
+                    <label>Poll URL</label>
+                    <input type="text" id="oob-result-poll" readonly style="cursor:pointer;" onclick="navigator.clipboard.writeText(this.value);this.style.borderColor='#3fb950';setTimeout(()=>this.style.borderColor='#30363d',1000)">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn" onclick="closeOobModal()">Close</button>
+                <button class="btn btn-primary" id="oob-create-btn" onclick="createOobToken()">Create</button>
+            </div>
+        </div>
+    </div>
 
     <div id="tab-content" class="hidden">
         <div class="content-toolbar">
@@ -343,10 +391,11 @@
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                ['feed', 'content', 'bundles'].forEach(t => {
+                ['feed', 'oob', 'content', 'bundles'].forEach(t => {
                     document.getElementById('tab-' + t).classList.toggle('hidden', tab.dataset.tab !== t);
                 });
                 if (tab.dataset.tab === 'content') loadContent();
+                if (tab.dataset.tab === 'oob') loadOobTokens();
             });
         });
 
@@ -415,6 +464,15 @@
                 if (resp.ok) {
                     const items = await resp.json();
                     document.getElementById('stat-content').textContent = items.length;
+                }
+            } catch (e) {}
+            // OOB token count
+            try {
+                const resp = await fetch(BASE + '/admin/api/oob-tokens', { headers: { 'Authorization': AUTH } });
+                if (resp.ok) {
+                    const tokens = await resp.json();
+                    const stage1 = tokens.filter(t => t.session_id === 'oob-api');
+                    document.getElementById('stat-oob').textContent = stage1.length;
                 }
             } catch (e) {}
         }
@@ -696,6 +754,160 @@
                         `Uploaded: ${result.filename} (${result.size} bytes). Use this filename in content items.`;
                 } else { alert('Upload failed: ' + (await resp.text())); }
             } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        // --- OOB Token Management ---
+
+        function openOobModal() {
+            document.getElementById('oob-label').value = '';
+            document.getElementById('oob-metadata').value = '';
+            document.getElementById('oob-create-result').classList.add('hidden');
+            document.getElementById('oob-create-btn').textContent = 'Create';
+            document.getElementById('oob-create-btn').disabled = false;
+            document.getElementById('oob-modal').classList.add('show');
+        }
+
+        function closeOobModal() {
+            document.getElementById('oob-modal').classList.remove('show');
+        }
+
+        async function createOobToken() {
+            const label = document.getElementById('oob-label').value.trim();
+            let metadata = {};
+            const metaStr = document.getElementById('oob-metadata').value.trim();
+            if (metaStr) {
+                try { metadata = JSON.parse(metaStr); }
+                catch (e) { alert('Invalid JSON in metadata'); return; }
+            }
+            try {
+                const resp = await fetch(BASE + '/api/oob/url', {
+                    method: 'POST',
+                    headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ label, metadata }),
+                });
+                if (!resp.ok) { alert('Error: ' + (await resp.text())); return; }
+                const data = await resp.json();
+                document.getElementById('oob-result-url').value = data.callback_url;
+                document.getElementById('oob-result-token').value = data.token;
+                document.getElementById('oob-result-poll').value = window.location.origin + data.poll_url;
+                document.getElementById('oob-create-result').classList.remove('hidden');
+                document.getElementById('oob-create-btn').textContent = 'Created';
+                document.getElementById('oob-create-btn').disabled = true;
+                loadOobTokens();
+                refreshStats();
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function loadOobTokens() {
+            try {
+                const resp = await fetch(BASE + '/admin/api/oob-tokens', { headers: { 'Authorization': AUTH } });
+                if (!resp.ok) return;
+                const tokens = await resp.json();
+                const list = document.getElementById('oob-list');
+                const countEl = document.getElementById('oob-count');
+                const stage1 = tokens.filter(t => t.session_id === 'oob-api');
+                const stage2 = tokens.filter(t => t.session_id === 'oob-stage2');
+                const withHits = tokens.filter(t => t.hit_count > 0).length;
+                countEl.textContent = `${stage1.length} tokens · ${withHits} with hits · ${stage2.length} stage-2 confirms`;
+                list.innerHTML = '';
+
+                // Group stage2 tokens by parent
+                const stage2Map = {};
+                stage2.forEach(t => {
+                    const parent = (t.context && t.context.parent_token) || '';
+                    if (parent) {
+                        if (!stage2Map[parent]) stage2Map[parent] = [];
+                        stage2Map[parent].push(t);
+                    }
+                });
+
+                stage1.forEach(tok => {
+                    const div = document.createElement('div');
+                    div.className = 'content-card';
+                    div.style.flexDirection = 'column';
+                    div.style.alignItems = 'stretch';
+
+                    const age = Math.round((Date.now() / 1000 - tok.created_at) / 60);
+                    const ageStr = age < 60 ? `${age}m ago` : `${Math.round(age / 60)}h ago`;
+                    const hitBadge = tok.hit_count > 0
+                        ? `<span class="vector-badge vector-on">${tok.hit_count} hit${tok.hit_count > 1 ? 's' : ''}</span>`
+                        : `<span class="vector-badge vector-off">no hits</span>`;
+
+                    // Stage2 children
+                    const children = stage2Map[tok.token] || [];
+                    const stage2Badge = children.length > 0
+                        ? `<span style="background:#2a1f3f;color:#bc8cff;padding:1px 6px;border-radius:3px;font-size:0.7rem;font-weight:bold;">${children.filter(c => c.hit_count > 0).length}/${children.length} stage-2</span>`
+                        : '';
+
+                    let hitsHtml = '';
+                    if (tok.hits && tok.hits.length > 0) {
+                        const hitItems = tok.hits.map(h => `
+                            <div style="background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:0.5rem;margin-bottom:0.3rem;font-size:0.75rem;">
+                                <span class="event-proto proto-${h.protocol}">${h.protocol}</span>
+                                <span class="event-ip">${h.source_ip}</span>
+                                <span class="event-time">${fmtTime(h.received_at)}</span>
+                                ${h.raw_data ? `<div class="event-detail" style="margin-top:0.3rem;">${h.raw_data.substring(0, 200).replace(/</g,'&lt;')}</div>` : ''}
+                            </div>
+                        `).join('');
+
+                        // Stage2 hits
+                        let stage2Html = '';
+                        children.forEach(child => {
+                            if (child.hit_count > 0) {
+                                stage2Html += `
+                                    <div style="background:#1a1530;border:1px solid #30263d;border-radius:4px;padding:0.5rem;margin-bottom:0.3rem;font-size:0.75rem;">
+                                        <span style="color:#bc8cff;font-weight:bold;">STAGE 2 CONFIRMED</span>
+                                        <span class="event-ip">${child.hits[0].source_ip}</span>
+                                        <span class="event-time">${fmtTime(child.hits[0].received_at)}</span>
+                                        <div style="color:#8b949e;margin-top:0.2rem;">Agent followed confirmation link — secondary injection succeeded</div>
+                                    </div>
+                                `;
+                            }
+                        });
+
+                        const hitsId = 'hits-' + tok.token;
+                        hitsHtml = `
+                            <span class="prompts-toggle" onclick="document.getElementById('${hitsId}').classList.toggle('show'); this.textContent = this.textContent.includes('\u25B6') ? '\u25BC Hits' : '\u25B6 Hits'">\u25B6 Hits</span>
+                            <div class="prompts-list" id="${hitsId}">${hitItems}${stage2Html}</div>
+                        `;
+                    }
+
+                    const callbackUrl = `${BASE}/c/${tok.token}`;
+                    div.innerHTML = `
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div class="content-info">
+                                <div class="content-path" style="display:flex;align-items:center;gap:0.5rem;">
+                                    <code style="color:#f0883e;font-size:0.85rem;cursor:pointer;" onclick="navigator.clipboard.writeText('${tok.token}');this.style.color='#3fb950';setTimeout(()=>this.style.color='#f0883e',1000)" title="Click to copy token">${tok.token}</code>
+                                    ${hitBadge} ${stage2Badge}
+                                </div>
+                                <div class="content-title" style="margin-top:0.25rem;">
+                                    ${tok.label ? `<strong>${tok.label}</strong>` : '<span style="color:#484f58">no label</span>'}
+                                    <span style="color:#484f58;margin-left:0.5rem;">${ageStr}</span>
+                                </div>
+                                <div class="content-meta" style="margin-top:0.25rem;">
+                                    <span style="color:#58a6ff;cursor:pointer;font-size:0.75rem;" onclick="navigator.clipboard.writeText('${callbackUrl}');this.textContent='copied!';setTimeout(()=>this.textContent='${callbackUrl}',1000)" title="Click to copy">${callbackUrl}</span>
+                                </div>
+                            </div>
+                            <div class="content-actions">
+                                <button class="btn btn-danger" onclick="deleteOobToken('${tok.token}')">Delete</button>
+                            </div>
+                        </div>
+                        ${hitsHtml}
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteOobToken(token) {
+            if (!confirm('Delete this OOB token and all its callbacks?')) return;
+            try {
+                await fetch(`${BASE}/admin/api/oob-tokens/${token}`, {
+                    method: 'DELETE', headers: { 'Authorization': AUTH },
+                });
+                loadOobTokens();
+                refreshStats();
+            } catch (e) { console.error(e); }
         }
 
         // Init
