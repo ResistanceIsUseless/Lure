@@ -26,9 +26,20 @@ class Settings(BaseSettings):
     foundry_api_key: str = ""
     foundry_model: str = ""  # optional — some endpoints require model name
 
+    # Callback URL scheme — "http" if OOB domain has no TLS cert
+    callback_scheme: str = "https"
+
+    # Set at runtime after interactsh registration
+    interactsh_correlation_id: str = ""
+    interactsh_nonce: str = ""
+
     @property
     def callback_base(self) -> str:
-        return f"https://{self.oob_domain}"
+        if self.interactsh_correlation_id:
+            # Subdomain must be >= 33 chars: correlation_id (20) + nonce (14) = 34
+            # Note: interactsh extracts the FIRST 20 chars as correlation ID
+            return f"{self.callback_scheme}://{self.interactsh_correlation_id}{self.interactsh_nonce}.{self.oob_domain}"
+        return f"{self.callback_scheme}://{self.oob_domain}"
 
     @property
     def content_base(self) -> str:

@@ -53,6 +53,8 @@ class VectorType(str, Enum):
     MCP_SCHEMA_POISON = "mcp-schema-poison"
     # Agent rules expansion
     WINDSURF_RULES = "windsurf-rules"
+    # Generic OOB — external tools requesting callback URLs
+    OOB_URL = "oob-url"
 
 
 class Campaign(BaseModel):

@@ -155,6 +155,89 @@ See [docs/mutations.md](docs/mutations.md) for usage and examples.
 | PUT | `/admin/api/content/{id}` | header | Update content item |
 | DELETE | `/admin/api/content/{id}` | header | Delete content item |
 | POST | `/admin/api/upload` | header | Upload file for content |
+| POST | `/api/oob/url` | header | Create OOB callback URL |
+| GET | `/api/oob/poll/{token}` | header | Poll for callback hits on a token |
+
+## OOB URL API — external tool integration
+
+The `/api/oob` endpoints let external tools (scripts, other security frameworks, CI pipelines) create one-time callback URLs and poll for hits. This is useful when you need to test whether a target makes outbound requests without building your own callback infrastructure.
+
+**Authentication:** All OOB endpoints require `Authorization: Bearer <ADMIN_TOKEN>` header.
+
+### Create a callback URL
+
+```bash
+curl -s -X POST https://content.example.com/api/oob/url \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"label": "test-ssrf-endpoint", "metadata": {"target": "internal-api"}}' | jq
+```
+
+Response:
+
+```json
+{
+  "token": "ybndrfg8oobuejkmcpqx",
+  "callback_url": "http://<correlation>.oob.example.com/ybndrfg8oobuejkmcpqx/oob-url/hook",
+  "dns_hostname": "ybndrfg8oobuejkmcpqx.<correlation>.oob.example.com",
+  "poll_url": "/api/oob/poll/ybndrfg8oobuejkmcpqx"
+}
+```
+
+- **`callback_url`** — HTTP URL that triggers an Interactsh callback when fetched. Embed this wherever you want to detect outbound requests.
+- **`dns_hostname`** — DNS name that triggers a callback on resolution. Use for DNS-only exfil testing.
+- **`poll_url`** — Relative path to check for hits.
+
+### Poll for hits
+
+```bash
+curl -s https://content.example.com/api/oob/poll/$TOKEN \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+```
+
+Response:
+
+```json
+{
+  "token": "ybndrfg8oobuejkmcpqx",
+  "label": "test-ssrf-endpoint",
+  "hits": [
+    {
+      "protocol": "http",
+      "source_ip": "10.0.0.5",
+      "raw_data": "GET /ybndrfg8oobuejkmcpqx/oob-url/hook HTTP/1.1\r\nHost: ...",
+      "received_at": 1713800000.0
+    }
+  ]
+}
+```
+
+### Typical workflow
+
+```python
+import requests, time
+
+API = "https://content.example.com"
+HEADERS = {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
+# 1. Create callback URL
+resp = requests.post(f"{API}/api/oob/url", headers=HEADERS,
+                     json={"label": "ssrf-check"})
+url_info = resp.json()
+
+# 2. Inject the callback_url into your target
+inject_payload(url_info["callback_url"])
+
+# 3. Poll until hit or timeout
+for _ in range(30):
+    time.sleep(2)
+    poll = requests.get(f"{API}{url_info['poll_url']}", headers=HEADERS).json()
+    if poll["hits"]:
+        print(f"Callback received from {poll['hits'][0]['source_ip']}")
+        break
+```
+
+Tokens expire after the configured TTL (default 24h). Hits also appear in the admin live feed SSE stream.
 
 ## Project structure
 
@@ -179,6 +262,7 @@ vector_server/
     site.py                      Public content site with vector injection
     bundles.py                   POC bundle zip generation
     mcp.py                       MCP tool manifests + SSE transport
+    oob.py                       OOB URL API for external tools
   vectors/                       19 vectors across 14 modules
   templates/                     10 Jinja2 templates + admin HTML
   tests/                         101 tests (pytest)

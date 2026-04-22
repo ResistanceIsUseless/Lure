@@ -16,6 +16,7 @@ services:
       -skip-acme
       -responder
       -http-index ""
+      -oih X-Forwarded-For
     volumes:
       - interactsh-certs:/certs
 
@@ -26,15 +27,18 @@ services:
     restart: unless-stopped
     ports:
       - "8443:8443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - path: ../vector_server/.env
         required: false
     environment:
       - OOB_DOMAIN=${OOB_DOMAIN:-oob.example.com}
       - CONTENT_DOMAIN=${CONTENT_DOMAIN:-content.example.com}
-      - INTERACTSH_URL=http://127.0.0.1:80
+      - INTERACTSH_URL=http://host.docker.internal:80
       - INTERACTSH_TOKEN=${INTERACTSH_TOKEN}
       - ADMIN_TOKEN=${ADMIN_TOKEN:-changeme}
+      - CALLBACK_SCHEME=http
       - FOUNDRY_ENDPOINT=${FOUNDRY_ENDPOINT:-}
       - FOUNDRY_API_KEY=${FOUNDRY_API_KEY:-}
       - FOUNDRY_MODEL=${FOUNDRY_MODEL:-}
@@ -47,6 +51,7 @@ services:
     network_mode: host
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /opt/lure/certs:/certs:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

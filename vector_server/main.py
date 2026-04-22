@@ -17,7 +17,7 @@ from content_store import ContentStore
 from correlation import CorrelationEngine
 from interactsh_client import InteractshClient
 from models import Protocol
-from routes import admin, bundles, chat, content, mcp, site
+from routes import admin, bundles, chat, content, mcp, oob, site
 
 # Ensure vector modules are imported so they register with the registry
 import vectors.agent_config  # noqa: F401
@@ -49,6 +49,10 @@ async def lifespan(application: FastAPI):
     application.state.interactsh = client
     try:
         await client.register()
+        # Update callback base to include interactsh nonce + correlation ID as subdomain
+        settings.interactsh_correlation_id = client.correlation_id
+        settings.interactsh_nonce = client.nonce
+        logger.info("Callback base: %s", settings.callback_base)
     except Exception:
         logger.warning("Could not register with Interactsh — polling will retry on first poll")
     poll_task = asyncio.create_task(_poll_loop(client))
@@ -69,6 +73,7 @@ admin.set_store(content_store)
 content.set_engine(engine)
 bundles.set_engine(engine)
 mcp.set_engine(engine)
+oob.set_engine(engine)
 chat.set_store(content_store)
 site.set_engine(engine)
 site.set_store(content_store)
@@ -78,6 +83,7 @@ app.include_router(chat.router)
 app.include_router(content.router)
 app.include_router(bundles.router)
 app.include_router(mcp.router)
+app.include_router(oob.router)
 app.include_router(site.router)
 
 
@@ -96,10 +102,21 @@ async def _poll_loop(client: InteractshClient) -> None:
 
 def _ingest_interactsh_event(event: dict) -> None:
     """Parse an Interactsh interaction record and feed it to the correlation engine."""
-    unique_id = event.get("unique-id", "")
-    # Interactsh unique-id contains our correlation token as a prefix of the subdomain
-    # Format: <token>.<random>.oob.example.com or just the subdomain portion
-    token = unique_id.split(".")[0] if "." in unique_id else unique_id
+    # Extract Lure token from the HTTP request path: /<token>/<vector_type>/<variant>
+    # Interactsh stores the path in raw-request (e.g., "GET /token/type/variant HTTP/1.1\r\n...")
+    token = ""
+    raw_request = event.get("raw-request", "")
+    if raw_request:
+        first_line = raw_request.split("\r\n")[0] if "\r\n" in raw_request else raw_request.split("\n")[0]
+        parts = first_line.split()
+        if len(parts) >= 2:
+            path_parts = parts[1].strip("/").split("/")
+            if path_parts and path_parts[0]:
+                token = path_parts[0]
+    if not token:
+        # Fallback for DNS-only callbacks: use unique-id subdomain
+        unique_id = event.get("unique-id", "")
+        token = unique_id.split(".")[0] if "." in unique_id else unique_id
 
     proto_str = event.get("protocol", "dns").lower()
     try:
@@ -115,7 +132,7 @@ def _ingest_interactsh_event(event: dict) -> None:
         protocol=protocol,
         source_ip=source_ip,
         raw_data=raw,
-        url_path=event.get("full-url", ""),
+        url_path=event.get("full-id", ""),
         query_params={},
     )
     # Push to SSE subscribers for live admin UI

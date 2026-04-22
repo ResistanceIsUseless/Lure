@@ -98,7 +98,10 @@ async def serve_well_known(request: Request) -> Response:
 
     # Broadcast access to live feed
     is_ai = bool(_AI_CRAWLER_RE.search(ua))
-    source_ip = request.client.host if request.client else ""
+    source_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "")
+    )
     _broadcast_site_access(
         path=path,
         source_ip=source_ip,

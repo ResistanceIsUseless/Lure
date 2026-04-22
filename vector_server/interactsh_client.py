@@ -28,18 +28,18 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 logger = logging.getLogger(__name__)
 
-# Interactsh uses OAEP + SHA256 for RSA, AES-256-CFB for payload encryption.
+# Interactsh v1.3.1 uses OAEP + SHA256 for RSA, AES-256-CTR for payload encryption.
 _RSA_KEY_SIZE = 2048
 _AES_KEY_BYTES = 32
 
 
-def _generate_keypair() -> tuple[rsa.RSAPrivateKey, bytes]:
+def _generate_keypair() -> tuple[rsa.RSAPrivateKey, str]:
     private = rsa.generate_private_key(public_exponent=65537, key_size=_RSA_KEY_SIZE)
-    pub_der = private.public_key().public_bytes(
-        serialization.Encoding.DER,
+    pub_pem = private.public_key().public_bytes(
+        serialization.Encoding.PEM,
         serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    return private, base64.b64encode(pub_der).decode()
+    return private, base64.b64encode(pub_pem).decode()
 
 
 def _rsa_decrypt(private_key: rsa.RSAPrivateKey, ciphertext_b64: str) -> bytes:
@@ -50,7 +50,7 @@ def _rsa_decrypt(private_key: rsa.RSAPrivateKey, ciphertext_b64: str) -> bytes:
 def _aes_decrypt(key: bytes, data_b64: str) -> bytes:
     raw = base64.b64decode(data_b64)
     iv, ct = raw[:16], raw[16:]
-    cipher = Cipher(algorithms.AES(key), modes.CFB(iv))
+    cipher = Cipher(algorithms.AES(key), modes.CTR(iv))
     dec = cipher.decryptor()
     return dec.update(ct) + dec.finalize()
 
@@ -60,7 +60,8 @@ class InteractshClient:
         self._server = server_url.rstrip("/")
         self._token = token
         self._private_key, self._pub_b64 = _generate_keypair()
-        self._correlation_id = secrets.token_hex(16)
+        self._correlation_id = secrets.token_hex(10)  # 20 chars — matches interactsh default
+        self._nonce = secrets.token_hex(7)  # 14 chars — subdomain needs >= 33 (20 + 13 nonce)
         self._secret_key = secrets.token_hex(16)
         self._aes_key: bytes | None = None
         self._registered = False
@@ -69,6 +70,10 @@ class InteractshClient:
     @property
     def correlation_id(self) -> str:
         return self._correlation_id
+
+    @property
+    def nonce(self) -> str:
+        return self._nonce
 
     async def register(self) -> None:
         payload = {
