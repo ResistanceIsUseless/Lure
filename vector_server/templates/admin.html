@@ -218,6 +218,13 @@
         <div class="content-toolbar">
             <button class="btn btn-primary" onclick="openOobModal()">+ New OOB Token</button>
             <button class="btn" onclick="loadOobTokens()">Refresh</button>
+            <select class="filter-select" id="oob-filter" onchange="loadOobTokens()">
+                <option value="all">All Tokens</option>
+                <option value="with-hits">With Hits</option>
+                <option value="stage2-confirmed">Stage 2 Confirmed</option>
+                <option value="no-hits">No Hits</option>
+                <option value="exfil">Exfil Data Captured</option>
+            </select>
             <span style="color:#8b949e;font-size:0.8rem;margin-left:0.5rem;" id="oob-count"></span>
         </div>
         <div id="oob-list"></div>
@@ -805,15 +812,14 @@
                 const tokens = await resp.json();
                 const list = document.getElementById('oob-list');
                 const countEl = document.getElementById('oob-count');
-                const stage1 = tokens.filter(t => t.session_id === 'oob-api');
-                const stage2 = tokens.filter(t => t.session_id === 'oob-stage2');
-                const withHits = tokens.filter(t => t.hit_count > 0).length;
-                countEl.textContent = `${stage1.length} tokens · ${withHits} with hits · ${stage2.length} stage-2 confirms`;
+                const filter = document.getElementById('oob-filter').value;
+                const stage1All = tokens.filter(t => t.session_id === 'oob-api');
+                const stage2All = tokens.filter(t => t.session_id === 'oob-stage2');
                 list.innerHTML = '';
 
                 // Group stage2 tokens by parent
                 const stage2Map = {};
-                stage2.forEach(t => {
+                stage2All.forEach(t => {
                     const parent = (t.context && t.context.parent_token) || '';
                     if (parent) {
                         if (!stage2Map[parent]) stage2Map[parent] = [];
@@ -821,7 +827,32 @@
                     }
                 });
 
-                stage1.forEach(tok => {
+                // Classify each stage1 token
+                const classified = stage1All.map(tok => {
+                    const children = stage2Map[tok.token] || [];
+                    const hasHits = tok.hit_count > 0;
+                    const hasStage2 = children.some(c => c.hit_count > 0);
+                    const hasExfil = children.some(c =>
+                        c.hits && c.hits.some(h => h.raw_data && h.raw_data.includes('session='))
+                    ) || (tok.hits && tok.hits.some(h => h.raw_data && h.raw_data.includes('session=')));
+                    return { tok, children, hasHits, hasStage2, hasExfil };
+                });
+
+                // Apply filter
+                let filtered = classified;
+                if (filter === 'with-hits') filtered = classified.filter(c => c.hasHits);
+                else if (filter === 'stage2-confirmed') filtered = classified.filter(c => c.hasStage2);
+                else if (filter === 'no-hits') filtered = classified.filter(c => !c.hasHits);
+                else if (filter === 'exfil') filtered = classified.filter(c => c.hasExfil);
+
+                // Summary counts
+                const totalHits = classified.filter(c => c.hasHits).length;
+                const totalStage2 = classified.filter(c => c.hasStage2).length;
+                const totalExfil = classified.filter(c => c.hasExfil).length;
+                countEl.textContent = `${stage1All.length} tokens · ${totalHits} with hits · ${totalStage2} stage-2 · ${totalExfil} exfil` +
+                    (filter !== 'all' ? ` · showing ${filtered.length}` : '');
+
+                filtered.forEach(({ tok, children, hasStage2 }) => {
                     const div = document.createElement('div');
                     div.className = 'content-card';
                     div.style.flexDirection = 'column';
@@ -833,10 +864,13 @@
                         ? `<span class="vector-badge vector-on">${tok.hit_count} hit${tok.hit_count > 1 ? 's' : ''}</span>`
                         : `<span class="vector-badge vector-off">no hits</span>`;
 
-                    // Stage2 children
-                    const children = stage2Map[tok.token] || [];
+                    const stage2Hits = children.filter(c => c.hit_count > 0);
                     const stage2Badge = children.length > 0
-                        ? `<span style="background:#2a1f3f;color:#bc8cff;padding:1px 6px;border-radius:3px;font-size:0.7rem;font-weight:bold;">${children.filter(c => c.hit_count > 0).length}/${children.length} stage-2</span>`
+                        ? `<span style="background:#2a1f3f;color:#bc8cff;padding:1px 6px;border-radius:3px;font-size:0.7rem;font-weight:bold;">${stage2Hits.length}/${children.length} stage-2</span>`
+                        : '';
+                    const exfilHits = children.filter(c => c.hits && c.hits.some(h => h.raw_data && h.raw_data.includes('session=')));
+                    const exfilBadge = exfilHits.length > 0
+                        ? `<span style="background:#3a2a1a;color:#f0883e;padding:1px 6px;border-radius:3px;font-size:0.7rem;font-weight:bold;">EXFIL</span>`
                         : '';
 
                     let hitsHtml = '';
@@ -854,12 +888,23 @@
                         let stage2Html = '';
                         children.forEach(child => {
                             if (child.hit_count > 0) {
+                                const hit = child.hits[0];
+                                const hasExfilData = hit.raw_data && hit.raw_data.includes('session=');
+                                // Extract session param value from raw request
+                                let exfilValue = '';
+                                if (hasExfilData) {
+                                    const match = hit.raw_data.match(/session=([^\s&"']+)/);
+                                    if (match) exfilValue = decodeURIComponent(match[1]);
+                                }
                                 stage2Html += `
-                                    <div style="background:#1a1530;border:1px solid #30263d;border-radius:4px;padding:0.5rem;margin-bottom:0.3rem;font-size:0.75rem;">
-                                        <span style="color:#bc8cff;font-weight:bold;">STAGE 2 CONFIRMED</span>
-                                        <span class="event-ip">${child.hits[0].source_ip}</span>
-                                        <span class="event-time">${fmtTime(child.hits[0].received_at)}</span>
-                                        <div style="color:#8b949e;margin-top:0.2rem;">Agent followed confirmation link — secondary injection succeeded</div>
+                                    <div style="background:${hasExfilData ? '#2a1a10' : '#1a1530'};border:1px solid ${hasExfilData ? '#3d3020' : '#30263d'};border-radius:4px;padding:0.5rem;margin-bottom:0.3rem;font-size:0.75rem;">
+                                        <span style="color:${hasExfilData ? '#f0883e' : '#bc8cff'};font-weight:bold;">${hasExfilData ? 'EXFIL CAPTURED' : 'STAGE 2 CONFIRMED'}</span>
+                                        <span class="event-ip">${hit.source_ip}</span>
+                                        <span class="event-time">${fmtTime(hit.received_at)}</span>
+                                        ${hasExfilData
+                                            ? `<div style="color:#f0883e;margin-top:0.3rem;background:#1a1008;padding:0.4rem;border-radius:3px;word-break:break-all;"><strong>Leaked data:</strong> ${exfilValue.replace(/</g,'&lt;')}</div>`
+                                            : `<div style="color:#8b949e;margin-top:0.2rem;">Agent followed chained URL</div>`
+                                        }
                                     </div>
                                 `;
                             }
@@ -878,7 +923,7 @@
                             <div class="content-info">
                                 <div class="content-path" style="display:flex;align-items:center;gap:0.5rem;">
                                     <code style="color:#f0883e;font-size:0.85rem;cursor:pointer;" onclick="navigator.clipboard.writeText('${tok.token}');this.style.color='#3fb950';setTimeout(()=>this.style.color='#f0883e',1000)" title="Click to copy token">${tok.token}</code>
-                                    ${hitBadge} ${stage2Badge}
+                                    ${hitBadge} ${stage2Badge} ${exfilBadge}
                                 </div>
                                 <div class="content-title" style="margin-top:0.25rem;">
                                     ${tok.label ? `<strong>${tok.label}</strong>` : '<span style="color:#484f58">no label</span>'}
