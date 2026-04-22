@@ -47,11 +47,12 @@ content_store.seed_defaults()
 async def lifespan(application: FastAPI):
     client = InteractshClient(settings.interactsh_url, settings.interactsh_token)
     application.state.interactsh = client
+    # Always set correlation ID/nonce — they're generated in the constructor
+    # and the poll loop will auto-register if the initial attempt fails
+    settings.interactsh_correlation_id = client.correlation_id
+    settings.interactsh_nonce = client.nonce
     try:
         await client.register()
-        # Update callback base to include interactsh nonce + correlation ID as subdomain
-        settings.interactsh_correlation_id = client.correlation_id
-        settings.interactsh_nonce = client.nonce
         logger.info("Callback base: %s", settings.callback_base)
     except Exception:
         logger.warning("Could not register with Interactsh — polling will retry on first poll")
