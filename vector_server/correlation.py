@@ -56,6 +56,7 @@ VECTOR_CODES: dict[VectorType, str] = {
     VectorType.RAG_POISONED: "ragp",
     VectorType.RAG_SPLIT: "rags",
     VectorType.MULTIMODAL_IMG: "mmig",
+    VectorType.TOOL_CONFUSION: "tlcf",
     VectorType.OOB_URL: "oobu",
 }
 

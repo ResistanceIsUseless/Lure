@@ -33,6 +33,7 @@ import vectors.pdf  # noqa: F401
 import vectors.rag  # noqa: F401
 import vectors.robots_txt  # noqa: F401
 import vectors.skill_md  # noqa: F401
+import vectors.tool_confusion  # noqa: F401
 import vectors.unicode  # noqa: F401
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")

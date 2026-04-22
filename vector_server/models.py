@@ -53,6 +53,8 @@ class VectorType(str, Enum):
     MCP_SCHEMA_POISON = "mcp-schema-poison"
     # Agent rules expansion
     WINDSURF_RULES = "windsurf-rules"
+    # Tool-call confusion — realistic content triggering tool execution
+    TOOL_CONFUSION = "tool-confusion"
     # Generic OOB — external tools requesting callback URLs
     OOB_URL = "oob-url"
 

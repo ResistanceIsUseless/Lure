@@ -35,6 +35,8 @@ class TestVectorRegistry:
             VectorType.MCP_TOOL_SHADOW, VectorType.MCP_SCHEMA_POISON,
             # Agent rules
             VectorType.WINDSURF_RULES,
+            # Tool confusion
+            VectorType.TOOL_CONFUSION,
         }
         assert registered == expected
 
