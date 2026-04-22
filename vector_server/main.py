@@ -23,6 +23,7 @@ from routes import admin, bundles, chat, content, mcp, site
 import vectors.agent_config  # noqa: F401
 import vectors.claude_hooks  # noqa: F401
 import vectors.copilot_vscode  # noqa: F401
+import vectors.gh_extension  # noqa: F401
 import vectors.html  # noqa: F401
 import vectors.llms_txt  # noqa: F401
 import vectors.markdown  # noqa: F401

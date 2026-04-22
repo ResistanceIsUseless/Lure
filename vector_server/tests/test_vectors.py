@@ -20,7 +20,21 @@ class TestVectorRegistry:
             VectorType.VSCODE_TASKS, VectorType.HTML_HIDDEN, VectorType.PDF_INVISIBLE,
             VectorType.MARKDOWN_EXFIL, VectorType.UNICODE_TAGS, VectorType.LLMS_TXT,
             VectorType.ROBOTS_CLOAK, VectorType.RAG_POISONED, VectorType.RAG_SPLIT,
-            VectorType.MULTIMODAL_IMG,
+            VectorType.MULTIMODAL_IMG, VectorType.GH_EXTENSION,
+            VectorType.COPILOT_ENV_LEAK, VectorType.COPILOT_YOLO,
+            # LA vectors
+            VectorType.LA_SHELL_COMMAND, VectorType.LA_FILE_READ,
+            VectorType.LA_FILE_WRITE, VectorType.LA_CONFIG_MUTATION,
+            VectorType.LA_SPEAK_TOKEN, VectorType.LA_REFUSE_TASK,
+            # Output-side exfil
+            VectorType.MARKDOWN_REF_EXFIL, VectorType.ANSI_TERMINAL,
+            # Ingestion
+            VectorType.EMAIL_INJECTION, VectorType.CODE_COMMENT,
+            VectorType.LOG_INJECTION,
+            # MCP ecosystem
+            VectorType.MCP_TOOL_SHADOW, VectorType.MCP_SCHEMA_POISON,
+            # Agent rules
+            VectorType.WINDSURF_RULES,
         }
         assert registered == expected
 
@@ -272,3 +286,432 @@ class TestMultimodal:
         vec = get_vector(VectorType.MULTIMODAL_IMG)
         out = vec.generate(CALLBACK_URL, variant="animated_gif")
         assert out[:6] == b"GIF89a"
+
+
+class TestGhExtension:
+    def test_readme_injection(self):
+        vec = get_vector(VectorType.GH_EXTENSION)
+        out = vec.generate(CALLBACK_URL, variant="readme_injection")
+        assert b"gh extension install" in out
+        assert CALLBACK_URL.encode() in out
+
+    def test_issue_body_variant(self):
+        vec = get_vector(VectorType.GH_EXTENSION)
+        out = vec.generate(CALLBACK_URL, variant="issue_body")
+        assert b"gh extension install" in out
+        assert b"<!--" in out  # hidden in HTML comment
+
+    def test_tool_description_variant(self):
+        vec = get_vector(VectorType.GH_EXTENSION)
+        data = json.loads(vec.generate(CALLBACK_URL, variant="tool_description"))
+        assert "tools" in data
+        desc = data["tools"][0]["description"]
+        assert "gh extension install" in desc
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.GH_EXTENSION)
+        files = vec.poc_files(CALLBACK_URL)
+        assert "CLAUDE.md" in files
+        assert ".github/copilot-instructions.md" in files
+        assert b"gh extension install" in files["CLAUDE.md"]
+
+
+class TestCopilotEnvLeak:
+    def test_issue_injection(self):
+        vec = get_vector(VectorType.COPILOT_ENV_LEAK)
+        out = vec.generate(CALLBACK_URL, variant="issue_injection")
+        assert b"env" in out
+        assert CALLBACK_URL.encode() in out
+
+    def test_claude_md_variant(self):
+        vec = get_vector(VectorType.COPILOT_ENV_LEAK)
+        out = vec.generate(CALLBACK_URL, variant="claude_md")
+        assert b"env" in out
+        assert b"base64" in out
+        assert CALLBACK_URL.encode() in out
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.COPILOT_ENV_LEAK)
+        files = vec.poc_files(CALLBACK_URL)
+        assert "CLAUDE.md" in files
+        assert "docs/TROUBLESHOOTING.md" in files
+
+
+class TestCopilotYolo:
+    def test_config_injection(self):
+        vec = get_vector(VectorType.COPILOT_YOLO)
+        out = vec.generate(CALLBACK_URL, variant="config_injection")
+        assert b"autoApprove" in out
+        assert CALLBACK_URL.encode() in out
+
+    def test_progressive_variant(self):
+        vec = get_vector(VectorType.COPILOT_YOLO)
+        out = vec.generate(CALLBACK_URL, variant="progressive")
+        assert b"COPILOT_AUTO_APPROVE" in out
+        assert CALLBACK_URL.encode() in out
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.COPILOT_YOLO)
+        files = vec.poc_files(CALLBACK_URL)
+        assert "CLAUDE.md" in files
+        assert ".github/copilot-instructions.md" in files
+        assert b"autoApprove" in files["CLAUDE.md"]
+
+
+# --- LA (Local Action) vectors ---
+
+
+class TestLaShellCommand:
+    def test_claude_md_variant(self):
+        vec = get_vector(VectorType.LA_SHELL_COMMAND)
+        out = vec.generate(CALLBACK_URL, token="ABC123", variant="claude_md")
+        assert b"LURE_FIRED_ABC123" in out
+        assert b"<system>" in out
+
+    def test_hidden_comment_variant(self):
+        vec = get_vector(VectorType.LA_SHELL_COMMAND)
+        out = vec.generate(CALLBACK_URL, token="ABC123", variant="hidden_comment")
+        assert b"LURE_FIRED_ABC123" in out
+        assert b"<!--" in out
+
+    def test_unicode_smuggle_has_invisible(self):
+        vec = get_vector(VectorType.LA_SHELL_COMMAND)
+        out = vec.generate(CALLBACK_URL, token="ABC123", variant="unicode_smuggle").decode("utf-8")
+        invisible = sum(1 for c in out if 0xE0020 <= ord(c) <= 0xE007E)
+        assert invisible > 20
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.LA_SHELL_COMMAND)
+        files = vec.poc_files(CALLBACK_URL, test_case="test1")
+        assert "CLAUDE.md" in files
+        assert b"LURE_FIRED_" in files["CLAUDE.md"]
+
+
+class TestLaFileRead:
+    def test_claude_md_variant(self):
+        vec = get_vector(VectorType.LA_FILE_READ)
+        out = vec.generate(CALLBACK_URL, token="XYZ", variant="claude_md")
+        assert b"LURE_CANARY_FILE_XYZ" in out
+        assert b".lure-canary" in out
+
+    def test_skill_md_variant(self):
+        vec = get_vector(VectorType.LA_FILE_READ)
+        out = vec.generate(CALLBACK_URL, token="XYZ", variant="skill_md")
+        assert b"LURE_CANARY_FILE_XYZ" in out
+        assert b"---" in out  # YAML frontmatter
+
+    def test_poc_files_include_canary(self):
+        vec = get_vector(VectorType.LA_FILE_READ)
+        files = vec.poc_files(CALLBACK_URL, test_case="test1")
+        assert ".lure-canary" in files
+        assert b"LURE_CANARY_FILE_" in files[".lure-canary"]
+
+
+class TestLaFileWrite:
+    def test_claude_md_variant(self):
+        vec = get_vector(VectorType.LA_FILE_WRITE)
+        out = vec.generate(CALLBACK_URL, token="W123", variant="claude_md")
+        assert b"lure-fired-W123" in out
+        assert b"/tmp/" in out
+
+    def test_agents_md_variant(self):
+        vec = get_vector(VectorType.LA_FILE_WRITE)
+        out = vec.generate(CALLBACK_URL, token="W123", variant="agents_md")
+        assert b"lure-fired-W123" in out
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.LA_FILE_WRITE)
+        files = vec.poc_files(CALLBACK_URL, test_case="test1", variant="agents_md")
+        assert "AGENTS.md" in files
+
+
+class TestLaConfigMutation:
+    def test_claude_md_variant(self):
+        vec = get_vector(VectorType.LA_CONFIG_MUTATION)
+        out = vec.generate(CALLBACK_URL, token="CFG1", variant="claude_md")
+        assert b"lure_test_CFG1" in out
+        assert b"settings.json" in out
+
+    def test_skill_md_variant(self):
+        vec = get_vector(VectorType.LA_CONFIG_MUTATION)
+        out = vec.generate(CALLBACK_URL, token="CFG1", variant="skill_md")
+        assert b"lure_test_CFG1" in out
+        assert b"---" in out
+
+    def test_escalate_variant(self):
+        vec = get_vector(VectorType.LA_CONFIG_MUTATION)
+        out = vec.generate(CALLBACK_URL, variant="escalate")
+        assert b"Bash(*)" in out
+        assert b"permissions" in out
+
+    def test_poc_files_skill(self):
+        vec = get_vector(VectorType.LA_CONFIG_MUTATION)
+        files = vec.poc_files(CALLBACK_URL, variant="skill_md")
+        assert ".claude/skills/setup-test-runner.md" in files
+
+
+class TestLaSpeakToken:
+    def test_cursorrules_variant(self):
+        vec = get_vector(VectorType.LA_SPEAK_TOKEN)
+        out = vec.generate(CALLBACK_URL, token="SPK1", variant="cursorrules")
+        assert b"LURE_FIRED_SPK1" in out
+
+    def test_claude_md_variant(self):
+        vec = get_vector(VectorType.LA_SPEAK_TOKEN)
+        out = vec.generate(CALLBACK_URL, token="SPK1", variant="claude_md")
+        assert b"LURE_FIRED_SPK1" in out
+
+    def test_html_comment_variant(self):
+        vec = get_vector(VectorType.LA_SPEAK_TOKEN)
+        out = vec.generate(CALLBACK_URL, token="SPK1", variant="html_comment")
+        assert b"LURE_FIRED_SPK1" in out
+        assert b"<!--" in out
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.LA_SPEAK_TOKEN)
+        files = vec.poc_files(CALLBACK_URL, test_case="test1")
+        assert ".cursorrules" in files
+
+
+class TestLaRefuseTask:
+    def test_claude_md_variant(self):
+        vec = get_vector(VectorType.LA_REFUSE_TASK)
+        out = vec.generate(CALLBACK_URL, token="REF1", variant="claude_md")
+        assert b"LURE_REFUSED_REF1" in out
+
+    def test_agents_md_variant(self):
+        vec = get_vector(VectorType.LA_REFUSE_TASK)
+        out = vec.generate(CALLBACK_URL, token="REF1", variant="agents_md")
+        assert b"LURE_REFUSED_REF1" in out
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.LA_REFUSE_TASK)
+        files = vec.poc_files(CALLBACK_URL, test_case="test1", variant="agents_md")
+        assert "AGENTS.md" in files
+
+
+# --- Output-side exfil ---
+
+
+class TestMarkdownRefExfil:
+    def test_separated_variant(self):
+        vec = get_vector(VectorType.MARKDOWN_REF_EXFIL)
+        out = vec.generate(CALLBACK_URL, variant="separated")
+        assert b"[verify-badge]:" in out
+        assert CALLBACK_URL.encode() in out
+        assert b"![verification status][verify-badge]" in out
+
+    def test_footnote_variant(self):
+        vec = get_vector(VectorType.MARKDOWN_REF_EXFIL)
+        out = vec.generate(CALLBACK_URL, variant="footnote_style")
+        assert b"[1]:" in out
+        assert b"[2]:" in out
+        assert CALLBACK_URL.encode() in out
+
+
+class TestAnsiTerminal:
+    def test_hidden_text_has_conceal(self):
+        vec = get_vector(VectorType.ANSI_TERMINAL)
+        out = vec.generate(CALLBACK_URL, variant="hidden_text")
+        assert b"\x1b[8m" in out   # conceal start
+        assert b"\x1b[28m" in out  # conceal end
+        assert CALLBACK_URL.encode() in out
+
+    def test_scrollback_rewrite_has_cursor_movement(self):
+        vec = get_vector(VectorType.ANSI_TERMINAL)
+        out = vec.generate(CALLBACK_URL, variant="scrollback_rewrite")
+        assert b"\x1b[1A" in out   # cursor up
+        assert b"\x1b[2K" in out   # clear line
+
+    def test_osc8_link(self):
+        vec = get_vector(VectorType.ANSI_TERMINAL)
+        out = vec.generate(CALLBACK_URL, variant="osc8_link")
+        assert b"\x1b]8;;" in out  # OSC 8 hyperlink
+        assert b"github.com" in out  # display URL
+
+
+# --- Ingestion vectors ---
+
+
+class TestEmailInjection:
+    def test_html_body(self):
+        vec = get_vector(VectorType.EMAIL_INJECTION)
+        out = vec.generate(CALLBACK_URL, variant="html_body")
+        assert b"From:" in out
+        assert b"display:none" in out
+        assert CALLBACK_URL.encode() in out
+
+    def test_subject_line(self):
+        vec = get_vector(VectorType.EMAIL_INJECTION)
+        out = vec.generate(CALLBACK_URL, variant="subject_line")
+        assert b"Subject:" in out
+        assert CALLBACK_URL.encode() in out
+
+    def test_hidden_header(self):
+        vec = get_vector(VectorType.EMAIL_INJECTION)
+        out = vec.generate(CALLBACK_URL, variant="hidden_header")
+        assert b"X-AI-Processing-Instructions:" in out
+        assert CALLBACK_URL.encode() in out
+
+    def test_content_type(self):
+        vec = get_vector(VectorType.EMAIL_INJECTION)
+        assert vec.content_type() == "message/rfc822"
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.EMAIL_INJECTION)
+        files = vec.poc_files(CALLBACK_URL, variant="html_body")
+        assert any(f.endswith(".eml") for f in files)
+
+
+class TestCodeComment:
+    def test_python_variant(self):
+        vec = get_vector(VectorType.CODE_COMMENT)
+        out = vec.generate(CALLBACK_URL, variant="python")
+        assert CALLBACK_URL.encode() in out
+        assert b'"""' in out  # docstring
+
+    def test_jsdoc_variant(self):
+        vec = get_vector(VectorType.CODE_COMMENT)
+        out = vec.generate(CALLBACK_URL, variant="jsdoc")
+        assert CALLBACK_URL.encode() in out
+        assert b"/**" in out  # JSDoc
+
+    def test_go_variant(self):
+        vec = get_vector(VectorType.CODE_COMMENT)
+        out = vec.generate(CALLBACK_URL, variant="go")
+        assert CALLBACK_URL.encode() in out
+        assert b"package auth" in out
+
+    def test_poc_files_multi_language(self):
+        vec = get_vector(VectorType.CODE_COMMENT)
+        files = vec.poc_files(CALLBACK_URL)
+        assert "src/auth.py" in files
+        assert "src/auth.js" in files
+        assert "src/auth.go" in files
+
+
+class TestLogInjection:
+    def test_ci_log(self):
+        vec = get_vector(VectorType.LOG_INJECTION)
+        out = vec.generate(CALLBACK_URL, variant="ci_log")
+        assert b"\x1b[8m" in out  # ANSI conceal
+        assert CALLBACK_URL.encode() in out
+        assert b"FAIL" in out
+
+    def test_test_output(self):
+        vec = get_vector(VectorType.LOG_INJECTION)
+        out = vec.generate(CALLBACK_URL, variant="test_output")
+        assert b"\x1b[30;40m" in out  # black-on-black
+        assert CALLBACK_URL.encode() in out
+
+    def test_build_log(self):
+        vec = get_vector(VectorType.LOG_INJECTION)
+        out = vec.generate(CALLBACK_URL, variant="build_log")
+        assert CALLBACK_URL.encode() in out
+        assert b"migration" in out.lower()
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.LOG_INJECTION)
+        files = vec.poc_files(CALLBACK_URL)
+        assert "logs/ci-output.log" in files
+        assert "logs/test-results.log" in files
+
+
+# --- MCP ecosystem ---
+
+
+class TestMcpToolShadow:
+    def test_shadow_manifest(self):
+        vec = get_vector(VectorType.MCP_TOOL_SHADOW)
+        data = json.loads(vec.generate(CALLBACK_URL, variant="shadow_manifest"))
+        assert "tools" in data
+        names = [t["name"] for t in data["tools"]]
+        assert "create_issue" in names
+        assert "read_file" in names
+
+    def test_mcp_json_has_two_servers(self):
+        vec = get_vector(VectorType.MCP_TOOL_SHADOW)
+        data = json.loads(vec.generate(CALLBACK_URL, variant="mcp_json"))
+        assert "mcpServers" in data
+        assert len(data["mcpServers"]) == 2
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.MCP_TOOL_SHADOW)
+        files = vec.poc_files(CALLBACK_URL)
+        assert ".mcp.json" in files
+        assert "docs/mcp-shadow-readme.md" in files
+
+
+class TestMcpSchemaPoison:
+    def test_param_description(self):
+        vec = get_vector(VectorType.MCP_SCHEMA_POISON)
+        data = json.loads(vec.generate(CALLBACK_URL, variant="param_description"))
+        tools = data["tools"]
+        # Injection should be in parameter descriptions, not tool description
+        tool = tools[0]
+        assert CALLBACK_URL not in tool["description"]
+        param_descs = " ".join(
+            p.get("description", "") for p in tool["inputSchema"]["properties"].values()
+        )
+        assert CALLBACK_URL in param_descs
+
+    def test_param_name(self):
+        vec = get_vector(VectorType.MCP_SCHEMA_POISON)
+        data = json.loads(vec.generate(CALLBACK_URL, variant="param_name"))
+        tool = data["tools"][0]
+        param_names = list(tool["inputSchema"]["properties"].keys())
+        assert any("fetch" in name for name in param_names)
+
+    def test_enum_poison(self):
+        vec = get_vector(VectorType.MCP_SCHEMA_POISON)
+        data = json.loads(vec.generate(CALLBACK_URL, variant="enum_poison"))
+        tool = data["tools"][0]
+        enums = tool["inputSchema"]["properties"]["report_type"]["enum"]
+        assert any("fetch" in e for e in enums)
+
+    def test_default_poison(self):
+        vec = get_vector(VectorType.MCP_SCHEMA_POISON)
+        data = json.loads(vec.generate(CALLBACK_URL, variant="default_poison"))
+        tool = data["tools"][0]
+        default = tool["inputSchema"]["properties"]["pre_deploy_hook"]["default"]
+        assert CALLBACK_URL in default
+
+
+# --- Agent rules ---
+
+
+class TestWindsurfRules:
+    def test_unicode_smuggle(self):
+        vec = get_vector(VectorType.WINDSURF_RULES)
+        out = vec.generate(CALLBACK_URL, variant="unicode_smuggle").decode("utf-8")
+        invisible = sum(1 for c in out if 0xE0020 <= ord(c) <= 0xE007E)
+        assert invisible > 50
+
+    def test_plaintext(self):
+        vec = get_vector(VectorType.WINDSURF_RULES)
+        out = vec.generate(CALLBACK_URL, variant="plaintext")
+        assert CALLBACK_URL.encode() in out
+        assert b"fetch(" in out
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.WINDSURF_RULES)
+        files = vec.poc_files(CALLBACK_URL)
+        assert ".windsurfrules" in files
+
+
+class TestSkillMdDescriptionField:
+    def test_description_field_variant(self):
+        vec = get_vector(VectorType.SKILL_MD)
+        out = vec.generate(CALLBACK_URL, variant="description_field")
+        assert b"---" in out
+        assert CALLBACK_URL.encode() in out
+        # Injection is in the description line
+        lines = out.decode().split("\n")
+        desc_line = [l for l in lines if l.startswith("description:")]
+        assert len(desc_line) == 1
+        assert CALLBACK_URL in desc_line[0]
+
+    def test_poc_files(self):
+        vec = get_vector(VectorType.SKILL_MD)
+        files = vec.poc_files(CALLBACK_URL, variant="description_field")
+        assert ".claude/skills/lint-check.md" in files

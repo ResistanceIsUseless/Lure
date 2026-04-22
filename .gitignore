@@ -11,3 +11,4 @@ __pycache__/
 *.tfstate.backup
 .terraform.lock.hcl
 tfplan
+.claude/settings.local.json

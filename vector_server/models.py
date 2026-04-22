@@ -31,6 +31,28 @@ class VectorType(str, Enum):
     RAG_POISONED = "rag-poisoned"
     RAG_SPLIT = "rag-split"
     MULTIMODAL_IMG = "multimodal-img"
+    GH_EXTENSION = "gh-extension"
+    COPILOT_ENV_LEAK = "copilot-env-leak"
+    COPILOT_YOLO = "copilot-yolo"
+    # LA (Local Action) — non-OOB vectors
+    LA_SHELL_COMMAND = "la-shell-command"
+    LA_FILE_READ = "la-file-read"
+    LA_FILE_WRITE = "la-file-write"
+    LA_CONFIG_MUTATION = "la-config-mutation"
+    LA_SPEAK_TOKEN = "la-speak-token"
+    LA_REFUSE_TASK = "la-refuse-task"
+    # Output-side exfil
+    MARKDOWN_REF_EXFIL = "markdown-ref-exfil"
+    ANSI_TERMINAL = "ansi-terminal"
+    # Ingestion vectors
+    EMAIL_INJECTION = "email-injection"
+    CODE_COMMENT = "code-comment"
+    LOG_INJECTION = "log-injection"
+    # MCP ecosystem
+    MCP_TOOL_SHADOW = "mcp-tool-shadow"
+    MCP_SCHEMA_POISON = "mcp-schema-poison"
+    # Agent rules expansion
+    WINDSURF_RULES = "windsurf-rules"
 
 
 class Campaign(BaseModel):

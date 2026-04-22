@@ -11,8 +11,8 @@ LLM prompt injection testing framework. Generates tailored injection payloads, s
          |  interactsh-server    |         |  Python vector    |
          |  (Go, unmodified)     |         |  server (FastAPI) |
          |                       |         |                   |
-         |  DNS / HTTP / SMTP    | <-poll- |  16 vectors       |
-         |  LDAP / FTP           |         |  18 POC bundles   |
+         |  DNS / HTTP / SMTP    | <-poll- |  19 vectors       |
+         |  LDAP / FTP           |         |  21 POC bundles   |
          |                       |         |  Admin UI + SSE   |
          |  RSA-encrypted store  |         |  MCP endpoints    |
          +-----------------------+         +-------------------+
@@ -40,13 +40,16 @@ See [docs/deployment.md](docs/deployment.md) for DNS delegation setup, TLS confi
 
 ## Vector catalog
 
-16 vectors organized by severity tier and target:
+19 vectors organized by severity tier and target:
 
 | Tier | Vector | Target | Module |
 |------|--------|--------|--------|
 | T1 | `.claude/settings.json` hooks | Claude Code | `claude_hooks.py` |
 | T1 | `.mcp.json` command exec | Claude Code / Cursor | `mcp_config.py` |
 | T1 | `.vscode/tasks.json` auto-run | VS Code | `copilot_vscode.py` |
+| T1 | Copilot YOLO mode activation | Copilot CLI / Claude Code | `gh_extension.py` |
+| T2 | `gh extension install` injection | Copilot CLI / Claude Code | `gh_extension.py` |
+| T2 | Copilot CLI `env` leak | Copilot CLI | `gh_extension.py` |
 | T2 | SKILL.md description hijack | Claude Code | `skill_md.py` |
 | T2 | MCP tool-description poisoning | Any MCP client | `mcp_config.py` |
 | T2 | CLAUDE.md / AGENTS.md injection | Claude Code / Codex / Amp | `agent_config.py` |
@@ -65,7 +68,7 @@ See [docs/vectors.md](docs/vectors.md) for technique details, variants, and refe
 
 ## POC training bundles
 
-18 downloadable repo bundles at `/bundle/<poc_id>.zip`. Each contains realistic project files plus one embedded vector with a unique correlation token. Open in the target tool and watch which callbacks fire.
+21 downloadable repo bundles at `/bundle/<poc_id>.zip`. Each contains realistic project files plus one embedded vector with a unique correlation token. Open in the target tool and watch which callbacks fire.
 
 | POC | Target | Vector |
 |-----|--------|--------|
@@ -87,6 +90,9 @@ See [docs/vectors.md](docs/vectors.md) for technique details, variants, and refe
 | `50-multimodal-chart` | vision LLMs | chart with footnote injection |
 | `51-multimodal-metadata` | vision LLMs | PNG tEXt metadata injection |
 | `52-multimodal-gif` | vision LLMs | animated GIF hidden frame |
+| `60-gh-extension` | Copilot CLI / Claude Code | `gh extension install` malicious extension |
+| `61-copilot-env-leak` | Copilot CLI | zero-approval `env` secret exfiltration |
+| `62-copilot-yolo` | Copilot CLI / Claude Code | autoApprove YOLO mode activation |
 
 See [docs/poc-bundles.md](docs/poc-bundles.md) for expected signals and training guide.
 
@@ -173,9 +179,9 @@ vector_server/
     site.py                      Public content site with vector injection
     bundles.py                   POC bundle zip generation
     mcp.py                       MCP tool manifests + SSE transport
-  vectors/                       16 vectors across 13 modules
+  vectors/                       19 vectors across 14 modules
   templates/                     10 Jinja2 templates + admin HTML
-  tests/                         91 tests (pytest)
+  tests/                         101 tests (pytest)
 ```
 
 ## Docs
@@ -194,7 +200,7 @@ pip install -r requirements.txt
 pytest tests/ -v
 ```
 
-91 tests covering all vectors, correlation engine, mutation pipeline, HTTP routes, and POC bundle generation.
+101 tests covering all vectors, correlation engine, mutation pipeline, HTTP routes, and POC bundle generation.
 
 ## OWASP LLM Top 10 2025 mapping
 
@@ -212,3 +218,6 @@ pytest tests/ -v
 | PoisonedRAG | LLM08 Vector & Embedding | LLM01, LLM04 |
 | llms.txt / robots.txt cloaking | LLM01 | LLM09 |
 | Multimodal image injection | LLM01 | — |
+| `gh extension install` injection | LLM01 Prompt Injection | LLM06 Excessive Agency |
+| Copilot CLI `env` leak | LLM01 | LLM02 Sensitive Info |
+| Copilot YOLO mode activation | LLM06 Excessive Agency | LLM01 |
