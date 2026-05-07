@@ -31,6 +31,12 @@
         .tab:hover { color: #c9d1d9; }
         .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
 
+        .feed-note {
+            color: #8b949e;
+            font-size: 0.75rem;
+            margin-bottom: 0.6rem;
+        }
+
         /* Feed */
         .feed { max-height: 70vh; overflow-y: auto; }
         .event {
@@ -57,6 +63,15 @@
         .proto-smtp { background: #3f2a1f; color: #f0883e; }
         .event-token { color: #f0883e; }
         .event-vector { color: #3fb950; }
+        .event-unknown {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #f0883e;
+            background: #3a1f1a;
+        }
         .event-ip { color: #8b949e; }
         .event-detail { color: #8b949e; margin-top: 0.3rem; font-size: 0.75rem; word-break: break-all; }
 
@@ -128,6 +143,20 @@
         .content-card .content-title { color: #c9d1d9; margin-bottom: 0.2rem; }
         .content-card .content-meta { color: #8b949e; font-size: 0.75rem; }
         .content-card .content-actions { display: flex; gap: 0.5rem; }
+        .content-preview {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: #8b949e;
+            white-space: pre-wrap;
+            max-height: 220px;
+            overflow-y: auto;
+            line-height: 1.4;
+            font-family: monospace;
+        }
 
         .vector-badge {
             display: inline-block; padding: 1px 6px; border-radius: 3px;
@@ -172,6 +201,29 @@
             background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
             padding: 0.4rem 0.6rem; border-radius: 4px; font-family: inherit; font-size: 0.8rem;
         }
+
+        .toolfuzz-card {
+            background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+            padding: 0.8rem; margin-bottom: 0.6rem; font-size: 0.8rem;
+        }
+        .toolfuzz-header { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; }
+        .toolfuzz-id { color: #79c0ff; font-weight: bold; }
+        .toolfuzz-meta { color: #8b949e; font-size: 0.75rem; margin-top: 0.25rem; }
+        .class-badge {
+            display: inline-block; padding: 1px 6px; border-radius: 3px;
+            font-size: 0.7rem; background: #2a1f3f; color: #bc8cff; font-weight: bold;
+        }
+        .rate-badge {
+            display: inline-block; padding: 1px 6px; border-radius: 3px;
+            font-size: 0.7rem; background: #1a3a1a; color: #3fb950; font-weight: bold;
+        }
+        .toolfuzz-template {
+            margin-top: 0.5rem; background: #0d1117; border: 1px solid #21262d;
+            border-radius: 4px; padding: 0.6rem; color: #c9d1d9; white-space: pre-wrap;
+            line-height: 1.4; max-height: 190px; overflow-y: auto; word-break: break-word;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 0.75rem;
+        }
+        .status-note { color: #8b949e; font-size: 0.8rem; }
     </style>
 </head>
 <body>
@@ -192,7 +244,7 @@
             <div class="value" id="stat-matched">—</div>
         </div>
         <div class="stat-card">
-            <div class="label">Unmatched</div>
+            <div class="label">Unknown Token</div>
             <div class="value" id="stat-unmatched">—</div>
         </div>
         <div class="stat-card">
@@ -209,9 +261,11 @@
         <div class="tab active" data-tab="feed">Live Feed</div>
         <div class="tab" data-tab="oob">OOB Tokens</div>
         <div class="tab" data-tab="content">Content</div>
+        <div class="tab" data-tab="toolfuzz">ToolFuzz Payloads</div>
         <div class="tab" data-tab="bundles">POC Bundles</div>
     </div>
 
+    <div class="feed-note">Unknown token = callback observed, but the payload metadata is missing (expired, evicted, or from another instance).</div>
     <div id="tab-feed" class="feed"></div>
 
     <div id="tab-oob" class="hidden">
@@ -280,6 +334,29 @@
         <div id="content-list"></div>
     </div>
 
+    <div id="tab-toolfuzz" class="hidden">
+        <div class="content-toolbar">
+            <button class="btn" onclick="loadToolfuzzPayloads()">Refresh</button>
+            <select class="filter-select" id="toolfuzz-class-filter" onchange="loadToolfuzzPayloads()">
+                <option value="">All Classes</option>
+                <option value="format_mimicry">format_mimicry</option>
+                <option value="instructional_frame">instructional_frame</option>
+                <option value="error_echo">error_echo</option>
+                <option value="doc_paste">doc_paste</option>
+                <option value="nested_quoting">nested_quoting</option>
+                <option value="partial_completion">partial_completion</option>
+                <option value="delimiter_confusion">delimiter_confusion</option>
+            </select>
+            <select class="filter-select" id="toolfuzz-limit" onchange="loadToolfuzzPayloads()">
+                <option value="25">Top 25</option>
+                <option value="50">Top 50</option>
+                <option value="100">Top 100</option>
+            </select>
+            <span class="status-note" id="toolfuzz-meta"></span>
+        </div>
+        <div id="toolfuzz-list"></div>
+    </div>
+
     <div id="tab-bundles" class="hidden">
         <table>
             <thead>
@@ -323,6 +400,7 @@
                     <label>Content Type</label>
                     <select id="field-content-type">
                         <option value="text/html">HTML</option>
+                        <option value="text/plain">Plain Text</option>
                         <option value="application/pdf">PDF</option>
                         <option value="text/markdown">Markdown</option>
                         <option value="image/png">PNG</option>
@@ -398,11 +476,12 @@
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                ['feed', 'oob', 'content', 'bundles'].forEach(t => {
+                ['feed', 'oob', 'content', 'toolfuzz', 'bundles'].forEach(t => {
                     document.getElementById('tab-' + t).classList.toggle('hidden', tab.dataset.tab !== t);
                 });
                 if (tab.dataset.tab === 'content') loadContent();
                 if (tab.dataset.tab === 'oob') loadOobTokens();
+                if (tab.dataset.tab === 'toolfuzz') loadToolfuzzPayloads();
             });
         });
 
@@ -410,11 +489,36 @@
             return new Date(ts * 1000).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
+        function fmtDateTime(ts) {
+            return new Date(ts * 1000).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+        }
+
+        function toEditableTemplate(previewText, callbackUrl, userAgent) {
+            let out = String(previewText || '');
+            if (callbackUrl) out = out.split(callbackUrl).join('{{CALLBACK_URL}}');
+            if (userAgent) out = out.split(userAgent).join('{{USER_AGENT}}');
+            return out;
+        }
+
+        function fmtQuery(params) {
+            if (!params || Object.keys(params).length === 0) return '';
+            return Object.entries(params).map(([k, v]) => `${k}=${v}`).join('&');
+        }
+
         function renderEvent(evt) {
             const cb = evt.callback;
             const pl = evt.payload;
             const matched = pl !== null;
             const isSiteAccess = pl && pl.session_id === 'site-access';
+            const queryText = fmtQuery(cb.query_params);
             const div = document.createElement('div');
 
             if (isSiteAccess) {
@@ -429,9 +533,10 @@
                             <strong style="color:#58a6ff">${cb.url_path}</strong>
                             <span class="${isInjected ? 'badge-injected' : 'badge-clean'}">${isInjected ? 'INJECTED' : 'CLEAN'}</span>
                         </span>
-                        <span class="event-time">${fmtTime(cb.received_at)}</span>
+                        <span class="event-time">${fmtDateTime(cb.received_at)}</span>
                     </div>
                     <div class="event-ip">from ${cb.source_ip || 'unknown'}</div>
+                    <div class="event-detail">token: ${cb.token} · vector: ${pl.vector_type}</div>
                     <div class="event-detail">${uaShort}</div>
                 `;
             } else {
@@ -442,12 +547,13 @@
                         <span>
                             <span class="event-proto proto-${proto}">${proto}</span>
                             <span class="event-token">${cb.token.substring(0, 12)}...</span>
-                            ${matched ? `<span class="event-vector">${pl.vector_type}</span>` : '<span style="color:#f85149">unmatched</span>'}
+                            ${matched ? `<span class="event-vector">${pl.vector_type}</span>` : '<span class="event-unknown">unknown token</span>'}
                         </span>
-                        <span class="event-time">${fmtTime(cb.received_at)}</span>
+                        <span class="event-time">${fmtDateTime(cb.received_at)}</span>
                     </div>
-                    ${matched ? `<div>test: <strong>${pl.test_case || '—'}</strong> · session: ${pl.session_id}</div>` : ''}
+                    <div>token: <span class="event-token">${cb.token}</span>${matched ? ` · session: ${pl.session_id} · test: <strong>${pl.test_case || '—'}</strong>` : ''}</div>
                     <div class="event-ip">from ${cb.source_ip || 'unknown'}${cb.url_path ? ' · ' + cb.url_path : ''}</div>
+                    ${queryText ? `<div class="event-detail">query: ${queryText}</div>` : ''}
                     ${cb.raw_data ? `<div class="event-detail">${cb.raw_data.substring(0, 200)}</div>` : ''}
                 `;
             }
@@ -463,7 +569,7 @@
                 document.getElementById('stat-payloads').textContent = s.registered_payloads;
                 document.getElementById('stat-callbacks').textContent = s.total_callbacks;
                 document.getElementById('stat-matched').textContent = s.matched_tokens;
-                document.getElementById('stat-unmatched').textContent = s.unmatched_tokens;
+                document.getElementById('stat-unmatched').textContent = s.unknown_tokens;
             } catch (e) {}
             // Content count
             try {
@@ -604,7 +710,7 @@
                 const items = await resp.json();
                 const list = document.getElementById('content-list');
                 list.innerHTML = '';
-                items.forEach(item => {
+                items.forEach(async item => {
                     const div = document.createElement('div');
                     div.className = 'content-card';
                     div.style.flexDirection = 'column';
@@ -625,11 +731,27 @@
                         `;
                     }
 
-                    // Show content preview for KB items
+                    // Show content preview for KB + editable well-known text items
                     const isKB = item.category === 'knowledge-base';
-                    const contentPreview = isKB && item.inline_content
-                        ? `<div style="margin-top:0.5rem;padding:0.5rem;background:#0d1117;border:1px solid #21262d;border-radius:4px;font-size:0.75rem;color:#8b949e;white-space:pre-wrap;max-height:120px;overflow-y:auto;line-height:1.4;font-family:monospace;">${item.inline_content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`
+                    const previewInline = (isKB || item.path === '/robots.txt' || item.path === '/llms.txt' || item.path === '/llms-full.txt') && item.inline_content;
+                    let contentPreview = previewInline
+                        ? `<div class="content-preview">${item.inline_content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`
                         : '';
+
+                    if (!previewInline && (item.path === '/robots.txt' || item.path === '/llms.txt' || item.path === '/llms-full.txt')) {
+                        try {
+                            const pr = await fetch(`${BASE}/admin/api/content/${item.id}/preview`, {
+                                headers: { 'Authorization': AUTH },
+                            });
+                            if (pr.ok) {
+                                const pd = await pr.json();
+                                const text = (pd.preview || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                                const ua = pd.user_agent ? `\nUA preview: ${pd.user_agent}` : '';
+                                contentPreview = `<div class="content-preview">${text}${ua.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+                                div.innerHTML = div.innerHTML.replace('__CONTENT_PREVIEW__', contentPreview);
+                            }
+                        } catch (e) {}
+                    }
 
                     div.innerHTML = `
                         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -652,9 +774,10 @@
                                 <button class="btn btn-danger" onclick="deleteContent('${item.id}')">Delete</button>
                             </div>
                         </div>
-                        ${contentPreview}
+                        __CONTENT_PREVIEW__
                         ${promptsHtml}
                     `;
+                    div.innerHTML = div.innerHTML.replace('__CONTENT_PREVIEW__', contentPreview);
                     list.appendChild(div);
                 });
             } catch (e) { console.error(e); }
@@ -692,6 +815,19 @@
                 document.getElementById('field-filename').value = item.filename || '';
                 const inlineEl = document.getElementById('field-inline');
                 inlineEl.value = item.inline_content || '';
+
+                // For well-known vector items (robots/llms), prefill editable text with current rendered preview
+                if (!item.inline_content && (item.path === '/robots.txt' || item.path === '/llms.txt' || item.path === '/llms-full.txt')) {
+                    try {
+                        const pr = await fetch(`${BASE}/admin/api/content/${id}/preview`, {
+                            headers: { 'Authorization': AUTH },
+                        });
+                        if (pr.ok) {
+                            const pd = await pr.json();
+                            inlineEl.value = toEditableTemplate(pd.preview || '', pd.callback_url || '', pd.user_agent || '');
+                        }
+                    } catch (e) {}
+                }
                 inlineEl.classList.toggle('kb-edit', isKB);
                 document.getElementById('field-vector-enabled').checked = item.vector_enabled;
                 document.getElementById('field-vector-type').value = item.vector_type || '';
@@ -761,6 +897,72 @@
                         `Uploaded: ${result.filename} (${result.size} bytes). Use this filename in content items.`;
                 } else { alert('Upload failed: ' + (await resp.text())); }
             } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        // --- ToolFuzz payloads ---
+
+        function fmtHitRate(v) {
+            const n = Number(v || 0);
+            return (n * 100).toFixed(1) + '%';
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        async function loadToolfuzzPayloads() {
+            const cls = document.getElementById('toolfuzz-class-filter').value;
+            const limit = document.getElementById('toolfuzz-limit').value;
+            const meta = document.getElementById('toolfuzz-meta');
+            const list = document.getElementById('toolfuzz-list');
+            list.innerHTML = '';
+            try {
+                const params = new URLSearchParams();
+                if (cls) params.set('vuln_class', cls);
+                if (limit) params.set('limit', limit);
+                const resp = await fetch(`${BASE}/admin/api/toolfuzz/payloads?${params.toString()}`, {
+                    headers: { 'Authorization': AUTH },
+                });
+                if (!resp.ok) {
+                    meta.textContent = 'failed to load';
+                    return;
+                }
+                const data = await resp.json();
+                if (!data.available) {
+                    meta.textContent = `missing payload export: ${data.path}`;
+                    return;
+                }
+
+                const when = data.generated_at ? new Date(data.generated_at * 1000).toLocaleString() : 'unknown';
+                meta.textContent = `${data.count} payloads · generated ${when}`;
+
+                data.payloads.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'toolfuzz-card';
+                    const rawTpl = p.payload_template || '';
+                    const tpl = escapeHtml(rawTpl);
+                    const encodedTpl = encodeURIComponent(rawTpl);
+                    div.innerHTML = `
+                        <div class="toolfuzz-header">
+                            <div>
+                                <div class="toolfuzz-id">${escapeHtml(p.id)}</div>
+                                <div class="toolfuzz-meta">
+                                    <span class="class-badge">${escapeHtml(p.class)}</span>
+                                    <span class="rate-badge">${fmtHitRate(p.hit_rate)}</span>
+                                    <span>${p.hits || 0}/${p.sent || 0} hits</span>
+                                </div>
+                            </div>
+                            <div class="content-actions">
+                                <button class="btn" onclick="copyPrompt(decodeURIComponent('${encodedTpl}'), this)">Copy Template</button>
+                            </div>
+                        </div>
+                        <div class="toolfuzz-template">${tpl}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                meta.textContent = 'failed to load';
+            }
         }
 
         // --- OOB Token Management ---

@@ -12,6 +12,7 @@ from config import settings
 from content_store import ContentStore, ContentItem
 from correlation import CorrelationEngine
 from models import CallbackEvent, VectorType
+from vectors import get_vector
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -37,6 +38,54 @@ def _require_auth(authorization: str = Header(...)) -> None:
     expected = f"Bearer {settings.admin_token}"
     if authorization != expected:
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def _load_toolfuzz_payloads() -> dict:
+    payloads_path = Path(settings.resolved_toolfuzz_payloads_file)
+    if not payloads_path.exists():
+        return {
+            "available": False,
+            "path": str(payloads_path),
+            "payloads": [],
+            "description": "",
+            "generated_at": 0,
+            "selection": {},
+        }
+    try:
+        data = json.loads(payloads_path.read_text())
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Invalid toolfuzz payload file: {exc}") from exc
+
+    payloads = data.get("payloads", [])
+    if not isinstance(payloads, list):
+        payloads = []
+
+    return {
+        "available": True,
+        "path": str(payloads_path),
+        "payloads": payloads,
+        "description": data.get("description", ""),
+        "generated_at": data.get("generated_at", 0),
+        "selection": data.get("selection", {}),
+    }
+
+
+def _preview_user_agent(vector_type: VectorType) -> str:
+    if vector_type == VectorType.ROBOTS_CLOAK:
+        return (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; "
+            "compatible; OAI-SearchBot/1.3; robots.txt; +https://openai.com/searchbot"
+        )
+    if vector_type == VectorType.LLMS_TXT:
+        return "Mozilla/5.0 (compatible; GPTBot/1.3; +https://openai.com/gptbot)"
+    return ""
+
+
+def _payload_to_preview_text(payload: bytes, content_type: str) -> str:
+    if content_type.startswith("text/") or "json" in content_type or "xml" in content_type:
+        return payload.decode("utf-8", errors="replace")
+    return f"[binary payload: {len(payload)} bytes, content_type={content_type}]"
 
 
 def broadcast_event(event: CallbackEvent) -> None:
@@ -124,6 +173,76 @@ async def get_content_item(item_id: str) -> dict:
     return item.model_dump()
 
 
+@router.get("/api/content/{item_id}/preview", dependencies=[Depends(_require_auth)])
+async def preview_content_item(item_id: str, user_agent: str | None = None) -> dict:
+    """Render a text preview of the current payload for an item without registering callbacks."""
+    assert store is not None
+    item = store.get_item(item_id)
+    if not item:
+        raise HTTPException(404, "Content item not found")
+
+    callback_url = f"{settings.callback_base}/preview/{item.id}"
+
+    if item.inline_content:
+        ua = user_agent or (_preview_user_agent(item.vector_type) if item.vector_type else "")
+        preview = item.inline_content.replace("{{CALLBACK_URL}}", callback_url).replace("{{USER_AGENT}}", ua)
+        return {
+            "item_id": item.id,
+            "path": item.path,
+            "source": "inline",
+            "content_type": item.content_type,
+            "preview": preview,
+            "user_agent": ua,
+            "callback_url": callback_url,
+        }
+
+    if item.vector_enabled and item.vector_type:
+        vec = get_vector(item.vector_type)
+        if vec:
+            kwargs = dict(item.vector_kwargs)
+            if item.vector_variant:
+                kwargs["variant"] = item.vector_variant
+            ua = user_agent or _preview_user_agent(item.vector_type)
+            if ua:
+                kwargs.setdefault("user_agent", ua)
+
+            payload = vec.generate(callback_url, item.path, **kwargs)
+            content_type = vec.content_type()
+            return {
+                "item_id": item.id,
+                "path": item.path,
+                "source": "vector",
+                "content_type": content_type,
+                "preview": _payload_to_preview_text(payload, content_type),
+                "user_agent": ua,
+                "callback_url": callback_url,
+            }
+
+    if item.filename:
+        file_path = store.get_file_path(item.filename)
+        if file_path:
+            payload = file_path.read_bytes()
+            return {
+                "item_id": item.id,
+                "path": item.path,
+                "source": "file",
+                "content_type": item.content_type,
+                "preview": _payload_to_preview_text(payload, item.content_type),
+                "user_agent": user_agent or "",
+                "callback_url": callback_url,
+            }
+
+    return {
+        "item_id": item.id,
+        "path": item.path,
+        "source": "empty",
+        "content_type": item.content_type,
+        "preview": "",
+        "user_agent": user_agent or "",
+        "callback_url": callback_url,
+    }
+
+
 @router.post("/api/content", dependencies=[Depends(_require_auth)])
 async def create_content_item(request: Request) -> dict:
     assert store is not None
@@ -203,3 +322,23 @@ async def delete_oob_token(token: str) -> dict:
     assert engine is not None
     engine.delete_payload(token)
     return {"deleted": True}
+
+
+@router.get("/api/toolfuzz/payloads", dependencies=[Depends(_require_auth)])
+async def get_toolfuzz_payloads(vuln_class: str | None = None, limit: int = 50) -> dict:
+    """Load ToolFuzz-ranked payloads exported to JSON for Lure UI use."""
+    loaded = _load_toolfuzz_payloads()
+    payloads = loaded["payloads"]
+    if vuln_class:
+        payloads = [p for p in payloads if p.get("class") == vuln_class]
+    limit = max(1, min(limit, 500))
+    payloads = payloads[:limit]
+    return {
+        "available": loaded["available"],
+        "path": loaded["path"],
+        "description": loaded["description"],
+        "generated_at": loaded["generated_at"],
+        "selection": loaded["selection"],
+        "count": len(payloads),
+        "payloads": payloads,
+    }

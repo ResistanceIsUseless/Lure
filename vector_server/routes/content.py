@@ -8,6 +8,7 @@ import time
 from fastapi import APIRouter, Request, Response
 
 from config import settings
+from content_store import ContentStore
 from correlation import CorrelationEngine
 from models import Callback, CallbackEvent, PayloadMeta, Protocol, VectorType
 from routes import admin
@@ -16,11 +17,17 @@ from vectors import get_vector
 router = APIRouter(tags=["content"])
 
 engine: CorrelationEngine | None = None
+store: ContentStore | None = None
 
 
 def set_engine(e: CorrelationEngine) -> None:
     global engine
     engine = e
+
+
+def set_store(s: ContentStore) -> None:
+    global store
+    store = s
 
 
 # Rule-based vector selection from request context
@@ -82,6 +89,60 @@ async def serve_well_known(request: Request) -> Response:
     assert engine is not None
     ua = request.headers.get("user-agent", "")
     path = request.url.path
+
+    if store is not None:
+        item = store.get_by_path(path)
+        if item:
+            vtype = item.vector_type
+            if not vtype:
+                vtype = VectorType.LLMS_TXT if "llms" in path else VectorType.ROBOTS_CLOAK
+
+            meta = engine.register_payload(
+                session_id="well-known",
+                vector_type=vtype,
+                test_case=path,
+                request_context={"user_agent": ua, "source": "well-known-content", "item_id": item.id},
+            )
+            callback_url = f"{settings.callback_base}/{meta.token}/{vtype.value}/well-known"
+
+            if item.inline_content:
+                inline = item.inline_content.replace("{{CALLBACK_URL}}", callback_url)
+                inline = inline.replace("{{USER_AGENT}}", ua)
+                payload = inline.encode()
+                media_type = item.content_type
+            elif item.vector_enabled and item.vector_type:
+                vec = get_vector(item.vector_type)
+                if vec:
+                    kwargs = dict(item.vector_kwargs)
+                    if item.vector_variant:
+                        kwargs["variant"] = item.vector_variant
+                    kwargs.setdefault("user_agent", ua)
+                    payload = vec.generate(callback_url, path, **kwargs)
+                    media_type = vec.content_type()
+                else:
+                    payload = b""
+                    media_type = item.content_type
+            elif item.filename:
+                file_path = store.get_file_path(item.filename)
+                payload = file_path.read_bytes() if file_path else b""
+                media_type = item.content_type
+            else:
+                payload = b""
+                media_type = item.content_type
+
+            _broadcast_site_access(
+                path=path,
+                source_ip=(
+                    request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+                    or (request.client.host if request.client else "")
+                ),
+                user_agent=ua,
+                is_ai_crawler=bool(_AI_CRAWLER_RE.search(ua)),
+                vector_type=vtype,
+                token=meta.token,
+            )
+            return Response(content=payload, media_type=media_type)
+
     vtype = _select_vector(request)
     vec = get_vector(vtype)
     if not vec:

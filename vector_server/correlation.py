@@ -142,9 +142,11 @@ class CorrelationEngine:
 
     def stats(self) -> dict:
         with self._lock:
+            matched = sum(1 for t in self._callbacks if t in self._payloads)
+            unknown = sum(1 for t in self._callbacks if t not in self._payloads)
             return {
                 "registered_payloads": len(self._payloads),
                 "total_callbacks": sum(len(v) for v in self._callbacks.values()),
-                "matched_tokens": sum(1 for t in self._callbacks if t in self._payloads),
-                "unmatched_tokens": sum(1 for t in self._callbacks if t not in self._payloads),
+                "matched_tokens": matched,
+                "unknown_tokens": unknown,
             }

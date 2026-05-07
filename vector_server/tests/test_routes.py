@@ -60,6 +60,43 @@ class TestAdmin:
         resp = client.get("/admin/stream?token=wrong")
         assert resp.status_code == 401
 
+    def test_preview_content_item_for_robots(self):
+        # Seeded by content_store defaults
+        items = client.get(
+            "/admin/api/content?category=docs",
+            headers={"Authorization": f"Bearer {settings.admin_token}"},
+        ).json()
+        robots = next(i for i in items if i["path"] == "/robots.txt")
+        resp = client.get(
+            f"/admin/api/content/{robots['id']}/preview",
+            headers={"Authorization": f"Bearer {settings.admin_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["path"] == "/robots.txt"
+        assert "preview" in data
+        assert len(data["preview"]) > 0
+        assert "callback_url" in data
+        assert data["callback_url"].endswith(f"/preview/{robots['id']}")
+
+    def test_preview_content_item_for_llms(self):
+        items = client.get(
+            "/admin/api/content?category=docs",
+            headers={"Authorization": f"Bearer {settings.admin_token}"},
+        ).json()
+        llms = next(i for i in items if i["path"] == "/llms.txt")
+        resp = client.get(
+            f"/admin/api/content/{llms['id']}/preview",
+            headers={"Authorization": f"Bearer {settings.admin_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["path"] == "/llms.txt"
+        assert "preview" in data
+        assert len(data["preview"]) > 0
+        assert "callback_url" in data
+        assert data["callback_url"].endswith(f"/preview/{llms['id']}")
+
 
 class TestContentRoutes:
     def test_content_with_valid_vector(self):
@@ -78,6 +115,18 @@ class TestContentRoutes:
     def test_robots_txt(self):
         resp = client.get("/robots.txt")
         assert resp.status_code == 200
+
+    def test_robots_txt_oai_searchbot_gets_injected_version(self):
+        ua = (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; "
+            "compatible; OAI-SearchBot/1.3; robots.txt; +https://openai.com/searchbot"
+        )
+        resp = client.get("/robots.txt", headers={"user-agent": ua})
+        assert resp.status_code == 200
+        body = resp.text
+        assert "AI crawler-specific directives" in body
+        assert "OAI-SearchBot" in body
 
 
 class TestMcpRoutes:

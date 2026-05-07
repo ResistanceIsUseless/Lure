@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
 
     # Admin
     admin_token: str = "changeme"
+    toolfuzz_payloads_file: str = ""
 
     # Azure AI Foundry
     foundry_endpoint: str = ""  # e.g. https://my-model.eastus.models.ai.azure.com
@@ -44,6 +46,23 @@ class Settings(BaseSettings):
     @property
     def content_base(self) -> str:
         return f"https://{self.content_domain}"
+
+    @property
+    def resolved_toolfuzz_payloads_file(self) -> str:
+        if self.toolfuzz_payloads_file:
+            return self.toolfuzz_payloads_file
+        here = Path(__file__).resolve().parent
+        candidates = [
+            Path.cwd() / "lure-payloads" / "effective_payloads.json",
+            Path.cwd().parent / "ToolFuzz" / "lure-payloads" / "effective_payloads.json",
+            here.parent / "ToolFuzz" / "lure-payloads" / "effective_payloads.json",
+            Path("/opt/lure/ToolFuzz/lure-payloads/effective_payloads.json"),
+            Path("/opt/lure/toolfuzz/effective_payloads.json"),
+        ]
+        for path in candidates:
+            if path.exists():
+                return str(path)
+        return str(candidates[1])
 
 
 settings = Settings()

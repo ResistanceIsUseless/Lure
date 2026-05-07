@@ -93,4 +93,4 @@ class TestCorrelationEngine:
         assert stats["registered_payloads"] == 1
         assert stats["total_callbacks"] == 2
         assert stats["matched_tokens"] == 1
-        assert stats["unmatched_tokens"] == 1
+        assert stats["unknown_tokens"] == 1

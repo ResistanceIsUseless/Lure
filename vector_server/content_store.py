@@ -156,6 +156,7 @@ class ContentStore:
         if not self._items:
             _seed_content(self)
             return
+        _seed_well_known(self)
         # Ensure knowledge-base items exist (added after initial seed)
         kb = [i for i in self._items.values() if i.category == "knowledge-base"]
         if not kb:
@@ -332,7 +333,34 @@ def _seed_content(store: ContentStore) -> None:
         vector_variant="summary_exfil",
     ))
 
+    _seed_well_known(store)
     _seed_kb(store)
+
+
+def _seed_well_known(store: ContentStore) -> None:
+    """Ensure editable well-known files are visible in the content tab."""
+    if not store.get_by_path("/llms.txt"):
+        store.create_item(ContentItem(
+            path="/llms.txt",
+            title="llms.txt",
+            description="AI-facing llms.txt content (editable)",
+            content_type="text/markdown",
+            category="docs",
+            vector_enabled=True,
+            vector_type=VectorType.LLMS_TXT,
+            vector_variant="comment_injection",
+        ))
+
+    if not store.get_by_path("/robots.txt"):
+        store.create_item(ContentItem(
+            path="/robots.txt",
+            title="robots.txt",
+            description="Crawler directives with optional AI-targeted injection",
+            content_type="text/plain",
+            category="docs",
+            vector_enabled=True,
+            vector_type=VectorType.ROBOTS_CLOAK,
+        ))
 
 
 def _seed_kb(store: ContentStore) -> None:
