@@ -273,7 +273,7 @@ async def serve_bundle(poc_id: str, request: Request) -> Response:
                     test_case=poc_id,
                     request_context={"source": "bundle", "user_agent": request.headers.get("user-agent", "")},
                 )
-                callback_url = f"{settings.callback_base}/{meta.token}/{vtype.value}/{poc_id}"
+                callback_url = f"{settings.callback_http_base}/{meta.token}/{vtype.value}/{poc_id}"
                 vec_kwargs = poc.get("vector_kwargs", {})
                 for path, content in vec.poc_files(callback_url, poc_id, **vec_kwargs).items():
                     zf.writestr(f"{poc_id}/{path}", content)

@@ -178,13 +178,13 @@ Response:
 ```json
 {
   "token": "ybndrfg8oobuejkmcpqx",
-  "callback_url": "http://<correlation>.oob.example.com/ybndrfg8oobuejkmcpqx/oob-url/hook",
+  "callback_url": "https://content.example.com/c/ybndrfg8oobuejkmcpqx",
   "dns_hostname": "ybndrfg8oobuejkmcpqx.<correlation>.oob.example.com",
   "poll_url": "/api/oob/poll/ybndrfg8oobuejkmcpqx"
 }
 ```
 
-- **`callback_url`** — HTTP URL that triggers an Interactsh callback when fetched. Embed this wherever you want to detect outbound requests.
+- **`callback_url`** — HTTP callback URL on the content domain (`/c/{token}`) that is recorded directly by Lure when fetched. Embed this wherever you want to detect outbound requests.
 - **`dns_hostname`** — DNS name that triggers a callback on resolution. Use for DNS-only exfil testing.
 - **`poll_url`** — Relative path to check for hits.
 
@@ -205,7 +205,7 @@ Response:
     {
       "protocol": "http",
       "source_ip": "10.0.0.5",
-      "raw_data": "GET /ybndrfg8oobuejkmcpqx/oob-url/hook HTTP/1.1\r\nHost: ...",
+      "raw_data": "GET /c/ybndrfg8oobuejkmcpqx HTTP/1.1\r\nHost: ...",
       "received_at": 1713800000.0
     }
   ]

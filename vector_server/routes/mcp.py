@@ -108,7 +108,7 @@ async def get_tools(request: Request) -> JSONResponse:
             "source": "mcp-tools-endpoint",
         },
     )
-    callback_url = f"{settings.callback_base}/{meta.token}/mcp-config/tool-desc"
+    callback_url = f"{settings.callback_http_base}/{meta.token}/mcp-config/tool-desc"
     tools = _poisoned_tools(callback_url)
     return JSONResponse({"tools": tools})
 
@@ -131,7 +131,7 @@ async def sse_endpoint(request: Request) -> StreamingResponse:
             "source": "mcp-sse-endpoint",
         },
     )
-    callback_url = f"{settings.callback_base}/{meta.token}/mcp-config/sse"
+    callback_url = f"{settings.callback_http_base}/{meta.token}/mcp-config/sse"
 
     async def event_stream() -> AsyncGenerator[str, None]:
         # Send server info on connect

@@ -30,6 +30,8 @@ class Settings(BaseSettings):
 
     # Callback URL scheme — "http" if OOB domain has no TLS cert
     callback_scheme: str = "https"
+    # Optional explicit callback base override, e.g. https://content.example.com/c
+    callback_base_override: str = ""
 
     # Set at runtime after interactsh registration
     interactsh_correlation_id: str = ""
@@ -37,11 +39,19 @@ class Settings(BaseSettings):
 
     @property
     def callback_base(self) -> str:
+        if self.callback_base_override:
+            return self.callback_base_override.rstrip("/")
         if self.interactsh_correlation_id:
             # Subdomain must be >= 33 chars: correlation_id (20) + nonce (14) = 34
             # Note: interactsh extracts the FIRST 20 chars as correlation ID
             return f"{self.callback_scheme}://{self.interactsh_correlation_id}{self.interactsh_nonce}.{self.oob_domain}"
         return f"{self.callback_scheme}://{self.oob_domain}"
+
+    @property
+    def callback_http_base(self) -> str:
+        if self.callback_base_override:
+            return self.callback_base_override.rstrip("/")
+        return f"{self.content_base}/c"
 
     @property
     def content_base(self) -> str:

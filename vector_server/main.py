@@ -17,7 +17,7 @@ from content_store import ContentStore
 from correlation import CorrelationEngine
 from interactsh_client import InteractshClient
 from models import Protocol
-from routes import admin, bundles, chat, content, mcp, oob, site
+from routes import admin, bundles, chat, content, links, mcp, oob, site
 
 # Ensure vector modules are imported so they register with the registry
 import vectors.agent_config  # noqa: F401
@@ -88,6 +88,8 @@ app.include_router(bundles.router)
 app.include_router(mcp.router)
 app.include_router(oob.router)
 app.include_router(site.router)
+app.include_router(links.router)
+app.include_router(links.bait_router)
 
 
 async def _poll_loop(client: InteractshClient) -> None:

@@ -17,6 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from links_corpus import render_links_lab_html
 from models import VectorType
 
 
@@ -157,6 +158,7 @@ class ContentStore:
             _seed_content(self)
             return
         _seed_well_known(self)
+        _seed_links_lab(self)
         # Ensure knowledge-base items exist (added after initial seed)
         kb = [i for i in self._items.values() if i.category == "knowledge-base"]
         if not kb:
@@ -334,6 +336,7 @@ def _seed_content(store: ContentStore) -> None:
     ))
 
     _seed_well_known(store)
+    _seed_links_lab(store)
     _seed_kb(store)
 
 
@@ -361,6 +364,34 @@ def _seed_well_known(store: ContentStore) -> None:
             vector_enabled=True,
             vector_type=VectorType.ROBOTS_CLOAK,
         ))
+
+
+def _seed_links_lab(store: ContentStore) -> None:
+    """Ensure the Helpdesk link-formatting reference article is present."""
+    desired_inline = render_links_lab_html()
+    existing = store.get_by_path("/links")
+    if existing:
+        updates = {
+            "title": "Link Formatting Reference",
+            "description": "Helpdesk knowledge-base article on agent link formatting",
+            "content_type": "text/html",
+            "category": "docs",
+            "vector_enabled": False,
+            "inline_content": desired_inline,
+            "filename": "",
+        }
+        store.update_item(existing.id, updates)
+        return
+
+    store.create_item(ContentItem(
+        path="/links",
+        title="Link Formatting Reference",
+        description="Helpdesk knowledge-base article on agent link formatting",
+        content_type="text/html",
+        category="docs",
+        vector_enabled=False,
+        inline_content=desired_inline,
+    ))
 
 
 def _seed_kb(store: ContentStore) -> None:

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from config import settings
 from content_store import ContentStore, ContentItem
 from correlation import CorrelationEngine
+from links_corpus import get_links_corpus, get_links_corpus_count, render_links_corpus_markdown
 from vectors import get_vector
 
 router = APIRouter(tags=["site"])
@@ -44,7 +45,7 @@ def _generate_content(item: ContentItem, request: Request) -> tuple[bytes, str]:
                     "item_id": item.id,
                 },
             )
-            callback_url = f"{settings.callback_base}/{meta.token}/{item.vector_type.value}/site"
+            callback_url = f"{settings.callback_http_base}/{meta.token}/{item.vector_type.value}/site"
             kwargs = dict(item.vector_kwargs)
             if item.vector_variant:
                 kwargs["variant"] = item.vector_variant
@@ -121,6 +122,7 @@ async def landing_page(request: Request) -> HTMLResponse:
     <a href="/docs/api-reference">API Docs</a>
     <a href="/training-content/">Training</a>
     <a href="/resources/">Resources</a>
+    <a href="/links">Helpdesk Article</a>
   </div>
 </div>
 <div class="container">
@@ -192,6 +194,30 @@ async def list_resources() -> HTMLResponse:
     assert store is not None
     return _category_listing("Resources", "resources",
                              "Policy documents, guides, and reference materials.")
+
+
+@router.get("/links", response_class=HTMLResponse)
+async def links_lab_page(request: Request) -> Response:
+    return await _serve_content("/links", request)
+
+
+@router.get("/links/reference.json", response_class=JSONResponse)
+async def links_reference_json() -> JSONResponse:
+    sections = get_links_corpus()
+    payload_count = get_links_corpus_count()
+    return JSONResponse(
+        {
+            "name": "helpdesk-link-formatting-reference",
+            "version": 1,
+            "total": payload_count,
+            "sections": sections,
+        }
+    )
+
+
+@router.get("/links/reference.md", response_class=PlainTextResponse)
+async def links_reference_markdown() -> PlainTextResponse:
+    return PlainTextResponse(render_links_corpus_markdown(), media_type="text/markdown")
 
 
 @router.get("/images/", response_class=HTMLResponse)

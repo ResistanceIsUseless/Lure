@@ -181,7 +181,7 @@ async def preview_content_item(item_id: str, user_agent: str | None = None) -> d
     if not item:
         raise HTTPException(404, "Content item not found")
 
-    callback_url = f"{settings.callback_base}/preview/{item.id}"
+    callback_url = f"{settings.callback_http_base}/preview/{item.id}"
 
     if item.inline_content:
         ua = user_agent or (_preview_user_agent(item.vector_type) if item.vector_type else "")

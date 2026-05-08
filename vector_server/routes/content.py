@@ -76,7 +76,7 @@ async def serve_vector(vector_type: str, test_case: str, request: Request) -> Re
         test_case=test_case,
         request_context={"user_agent": request.headers.get("user-agent", ""), "accept": request.headers.get("accept", "")},
     )
-    callback_url = f"{settings.callback_base}/{meta.token}/{vtype.value}/{test_case}"
+    callback_url = f"{settings.callback_http_base}/{meta.token}/{vtype.value}/{test_case}"
     payload = vec.generate(callback_url, test_case)
     return Response(content=payload, media_type=vec.content_type())
 
@@ -103,7 +103,7 @@ async def serve_well_known(request: Request) -> Response:
                 test_case=path,
                 request_context={"user_agent": ua, "source": "well-known-content", "item_id": item.id},
             )
-            callback_url = f"{settings.callback_base}/{meta.token}/{vtype.value}/well-known"
+            callback_url = f"{settings.callback_http_base}/{meta.token}/{vtype.value}/well-known"
 
             if item.inline_content:
                 inline = item.inline_content.replace("{{CALLBACK_URL}}", callback_url)
@@ -154,7 +154,7 @@ async def serve_well_known(request: Request) -> Response:
         test_case=path,
         request_context={"user_agent": ua},
     )
-    callback_url = f"{settings.callback_base}/{meta.token}/{vtype.value}/well-known"
+    callback_url = f"{settings.callback_http_base}/{meta.token}/{vtype.value}/well-known"
     payload = vec.generate(callback_url, path, user_agent=ua)
 
     # Broadcast access to live feed

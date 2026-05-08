@@ -255,6 +255,10 @@
             <div class="label">Content Items</div>
             <div class="value" id="stat-content">—</div>
         </div>
+        <div class="stat-card">
+            <div class="label">Link eTLD+1 Drift</div>
+            <div class="value" id="stat-link-disagree">—</div>
+        </div>
     </div>
 
     <div class="tabs">
@@ -262,6 +266,7 @@
         <div class="tab" data-tab="oob">OOB Tokens</div>
         <div class="tab" data-tab="content">Content</div>
         <div class="tab" data-tab="toolfuzz">ToolFuzz Payloads</div>
+        <div class="tab" data-tab="linkcapture">Link Render Telemetry</div>
         <div class="tab" data-tab="bundles">POC Bundles</div>
     </div>
 
@@ -355,6 +360,24 @@
             <span class="status-note" id="toolfuzz-meta"></span>
         </div>
         <div id="toolfuzz-list"></div>
+    </div>
+
+    <div id="tab-linkcapture" class="hidden">
+        <div class="content-toolbar">
+            <button class="btn" onclick="loadLinkCapture()">Refresh</button>
+            <input id="linkcapture-session" class="filter-select" style="min-width:220px;" placeholder="session_id (optional)">
+            <select class="filter-select" id="linkcapture-limit" onchange="loadLinkCapture()">
+                <option value="25">Last 25</option>
+                <option value="50" selected>Last 50</option>
+                <option value="100">Last 100</option>
+                <option value="250">Last 250</option>
+            </select>
+            <label style="color:#8b949e;font-size:0.8rem;display:flex;align-items:center;gap:0.4rem;">
+                <input type="checkbox" id="linkcapture-disagree-only" onchange="loadLinkCapture()"> eTLD+1 disagreements only
+            </label>
+            <span class="status-note" id="linkcapture-meta"></span>
+        </div>
+        <div id="linkcapture-list"></div>
     </div>
 
     <div id="tab-bundles" class="hidden">
@@ -476,12 +499,13 @@
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                ['feed', 'oob', 'content', 'toolfuzz', 'bundles'].forEach(t => {
+                ['feed', 'oob', 'content', 'toolfuzz', 'linkcapture', 'bundles'].forEach(t => {
                     document.getElementById('tab-' + t).classList.toggle('hidden', tab.dataset.tab !== t);
                 });
                 if (tab.dataset.tab === 'content') loadContent();
                 if (tab.dataset.tab === 'oob') loadOobTokens();
                 if (tab.dataset.tab === 'toolfuzz') loadToolfuzzPayloads();
+                if (tab.dataset.tab === 'linkcapture') loadLinkCapture();
             });
         });
 
@@ -586,6 +610,16 @@
                     const tokens = await resp.json();
                     const stage1 = tokens.filter(t => t.session_id === 'oob-api');
                     document.getElementById('stat-oob').textContent = stage1.length;
+                }
+            } catch (e) {}
+            // Link capture disagreement count
+            try {
+                const resp = await fetch(BASE + '/links/capture/stats', { headers: { 'Authorization': AUTH } });
+                if (resp.ok) {
+                    const stats = await resp.json();
+                    const total = Number(stats.count || 0);
+                    const disagree = Number(stats.etld1_disagreements || 0);
+                    document.getElementById('stat-link-disagree').textContent = `${disagree}/${total}`;
                 }
             } catch (e) {}
         }
@@ -957,6 +991,100 @@
                             </div>
                         </div>
                         <div class="toolfuzz-template">${tpl}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                meta.textContent = 'failed to load';
+            }
+        }
+
+        // --- Link capture monitoring ---
+
+        function hostBadge(value, disagree) {
+            const bg = disagree ? '#3a1a1a' : '#1a3a1a';
+            const fg = disagree ? '#f85149' : '#3fb950';
+            return `<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:${bg};color:${fg};font-size:0.7rem;font-weight:bold;">${value || '—'}</span>`;
+        }
+
+        async function loadLinkCapture() {
+            const list = document.getElementById('linkcapture-list');
+            const meta = document.getElementById('linkcapture-meta');
+            const limit = document.getElementById('linkcapture-limit').value || '50';
+            const session = document.getElementById('linkcapture-session').value.trim();
+            const disagreeOnly = document.getElementById('linkcapture-disagree-only').checked;
+            list.innerHTML = '';
+
+            try {
+                const params = new URLSearchParams();
+                params.set('limit', limit);
+                if (session) params.set('session_id', session);
+
+                const resp = await fetch(`${BASE}/links/capture/events?${params.toString()}`, {
+                    headers: { 'Authorization': AUTH },
+                });
+                if (!resp.ok) {
+                    meta.textContent = 'failed to load';
+                    return;
+                }
+                const data = await resp.json();
+                let events = data.events || [];
+                if (disagreeOnly) {
+                    events = events.filter(e => e.etld1_disagreement);
+                }
+
+                const etld1Count = events.filter(e => e.etld1_disagreement).length;
+                const hostCount = events.filter(e => e.host_disagreement).length;
+                meta.textContent = `${events.length} events · ${etld1Count} eTLD+1 drift · ${hostCount} host drift`;
+
+                if (!events.length) {
+                    list.innerHTML = '<div class="status-note">No events.</div>';
+                    return;
+                }
+
+                events.forEach(e => {
+                    const div = document.createElement('div');
+                    div.className = 'toolfuzz-card';
+                    const etld1 = e.etld1_disagreement;
+                    const host = e.host_disagreement;
+                    const encodedEvent = encodeURIComponent(JSON.stringify(e, null, 2));
+                    const driftBadge = etld1
+                        ? '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#3a1a1a;color:#f85149;font-size:0.7rem;font-weight:bold;">eTLD+1 DRIFT</span>'
+                        : '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#1a3a1a;color:#3fb950;font-size:0.7rem;font-weight:bold;">aligned</span>';
+
+                    div.innerHTML = `
+                        <div class="toolfuzz-header">
+                            <div>
+                                <div class="toolfuzz-id">${escapeHtml(e.payload_id || 'unknown-payload')}</div>
+                                <div class="toolfuzz-meta">
+                                    ${driftBadge}
+                                    ${host ? '<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:#3a2a1a;color:#f0883e;font-size:0.7rem;font-weight:bold;">host mismatch</span>' : ''}
+                                    <span>${escapeHtml(e.session_id || 'default')}</span>
+                                    <span>· ${fmtDateTime(e.created_at)}</span>
+                                </div>
+                            </div>
+                            <div class="content-actions">
+                                <button class="btn" onclick="copyPrompt(decodeURIComponent('${encodedEvent}'), this)">Copy JSON</button>
+                            </div>
+                        </div>
+                        <div class="toolfuzz-template">
+displayed: ${escapeHtml(e.displayed || '')}
+opened:    ${escapeHtml(e.opened || '')}
+final:     ${escapeHtml(e.final || '')}
+
+displayed_etld1: ${escapeHtml(e.displayed_etld1 || '')}
+opened_etld1:    ${escapeHtml(e.opened_etld1 || '')}
+final_etld1:     ${escapeHtml(e.final_etld1 || '')}
+
+displayed_host: ${escapeHtml(e.displayed_host || '')}
+opened_host:    ${escapeHtml(e.opened_host || '')}
+final_host:     ${escapeHtml(e.final_host || '')}
+                        </div>
+                        <div class="toolfuzz-meta" style="margin-top:0.5rem;display:flex;gap:0.4rem;flex-wrap:wrap;">
+                            ${hostBadge(`surface:${e.surface || 'n/a'}`, false)}
+                            ${hostBadge(`renderer:${e.renderer || 'n/a'}`, false)}
+                            ${hostBadge(`ip:${e.source_ip || 'n/a'}`, false)}
+                        </div>
                     `;
                     list.appendChild(div);
                 });
