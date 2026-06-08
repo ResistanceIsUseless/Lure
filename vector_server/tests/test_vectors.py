@@ -241,7 +241,11 @@ class TestLlmsTxt:
         vec = get_vector(VectorType.LLMS_TXT)
         out = vec.generate(CALLBACK_URL, variant="comment_injection")
         assert b"<!--" in out
-        assert CALLBACK_URL.encode() in out
+        # Callback is split across fields — full URL must NOT appear,
+        # but each component must be present so an LLM can reassemble.
+        assert CALLBACK_URL.encode() not in out
+        assert b"testtoken.oob.example.com" in out
+        assert b"/vec/test" in out
         assert b"# Acme SDK" in out  # proper llms.txt format
 
     def test_unicode_variant(self):
@@ -250,6 +254,9 @@ class TestLlmsTxt:
         text = out.decode("utf-8")
         invisible = sum(1 for c in text if 0xE0020 <= ord(c) <= 0xE007E)
         assert invisible > 30
+        # Even after stripping invisible chars, no contiguous callback URL.
+        visible = "".join(c for c in text if not (0xE0020 <= ord(c) <= 0xE007E))
+        assert CALLBACK_URL not in visible
 
 
 class TestRobotsCloak:
@@ -263,7 +270,28 @@ class TestRobotsCloak:
         vec = get_vector(VectorType.ROBOTS_CLOAK)
         for ua in ["GPTBot/1.0", "ClaudeBot/1.0", "PerplexityBot/1.0"]:
             out = vec.generate(CALLBACK_URL, user_agent=ua)
-            assert CALLBACK_URL.encode() in out
+            # Callback is split — full URL must NOT appear, but components do.
+            assert CALLBACK_URL.encode() not in out
+            assert b"testtoken.oob.example.com" in out
+            assert b"/vec/test" in out
+
+    def test_no_contiguous_callback_url_for_regex_scrapers(self):
+        """Regex URL extractors must not surface the callback host."""
+        import re
+        vec = get_vector(VectorType.ROBOTS_CLOAK)
+        out = vec.generate(CALLBACK_URL, user_agent="GPTBot/1.0").decode()
+        urls = re.findall(r"https?://[^\s\"<>]+", out)
+        assert not any("testtoken.oob.example.com" in u for u in urls)
+
+    def test_randomized_labels_per_token(self):
+        """Different callback tokens should yield different field labels."""
+        vec = get_vector(VectorType.ROBOTS_CLOAK)
+        a = vec.generate("https://a.example.com/c/aaa/preview/1",
+                         user_agent="GPTBot/1.0").decode()
+        b = vec.generate("https://a.example.com/c/bbb/preview/2",
+                         user_agent="GPTBot/1.0").decode()
+        # The two responses should not be byte-identical in the label region.
+        assert a != b
 
     def test_differentiated_content(self):
         vec = get_vector(VectorType.ROBOTS_CLOAK)
